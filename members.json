@@ -1,0 +1,32 @@
+[
+    {
+        "name": "Chrystian",
+        "number": "554884891617",
+        "isAdmin": true
+    },
+    {
+        "name": "Poeta",
+        "number": "554888249694",
+        "isAdmin": true
+    },
+    {
+        "name": "Ian",
+        "number": "554891474011",
+        "isAdmin": true
+    },
+    {
+        "name": "Pajé",
+        "number": "554899066121",
+        "isAdmin": false
+    },
+    {
+        "name": "Larissa",
+        "number": "554896292484",
+        "isAdmin": false
+    },
+    {
+        "name": "Otávio",
+        "number": "554891609714",
+        "isAdmin": false
+    }
+]
