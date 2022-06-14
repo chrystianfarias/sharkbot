@@ -1,8 +1,17 @@
-const { Buttons, Client } = require('whatsapp-web.js');
+const { Client, LocalAuth, Buttons } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
-const client = new Client();
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+
+const client = new Client({
+    ffmpegPath: "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
+    authStrategy: new LocalAuth({
+      clientId: "client-one"
+    }),
+    puppeteer: {
+      headless: false,
+    }
+  });
 
 client.on('qr', (qr) => {
     qrcode.generate(qr, {small: true});
@@ -10,6 +19,8 @@ client.on('qr', (qr) => {
 
 client.on('ready', async () => {
     console.log('Client is ready!');
+    const ver = await client.getWWebVersion();
+    console.log(ver);
 });
 
 const getMembers = () => {
@@ -18,10 +29,46 @@ const getMembers = () => {
 }
 const getMember = (number) => {
     let members = getMembers();
-    return members.find(m => m.number == number);
+    const member = members.find(m => m.number == number);
+    if (member)
+    {
+        member.isSharker = true;
+        return member;
+    }
+    else
+        return {
+            name: number,
+            number: number
+        }
+}
+const formatTwoDecimal = (number) => {
+    return number <= 9 ? "0" + number : number;
 }
 const eventStringify = (event) => {
-    return `*EVENTO*\n\n${event.name}\nData: ${event.date}\nLocal: ${event.local}`;
+    const date = new Date(event.date);
+    return `*EVENTO*\n${event.name}\n📅 ${formatTwoDecimal(date.getDate())}/${formatTwoDecimal(date.getMonth())}/${formatTwoDecimal(date.getFullYear())}\n🕓 ${formatTwoDecimal(date.getHours())}:${formatTwoDecimal(date.getMinutes())}\n📍 ${event.local}`;
+}
+const checkinMemberPresence = async (member, event) => {
+    var currentEvent = JSON.parse(fs.readFileSync("events/" + event.id + ".json"));
+    currentEvent.checkin.push(member.number);
+    fs.writeFileSync("events/" + event.id + ".json", JSON.stringify(currentEvent));
+    
+    var _phoneId = await client.getNumberId(member.number)
+    var _isValid = await client.isRegisteredUser(_phoneId._serialized)
+    if(_isValid) {
+        client.sendMessage(_phoneId._serialized, `Olá ${member.name}, seu check-in no evento '${event.name}' foi feito ✅`);
+        currentChat[_phoneId._serialized] = "event_response";
+        currentEvent[_phoneId._serialized] = event;
+    }
+    else
+    {
+        console.error(`O número do ${member.name} é invalido! (${member.number})`);
+    }
+}
+const checkoutMemberPresence = (member, event) => {
+    var currentEvent = JSON.parse(fs.readFileSync("events/" + event.id + ".json"));
+    currentEvent.checkin = currentEvent.checkin.filter(n => n !== member.number);
+    fs.writeFileSync("events/" + event.id + ".json", JSON.stringify(currentEvent));
 }
 const confirmPresence = (member, event) => {
     var currentEvent = JSON.parse(fs.readFileSync("events/" + event.id + ".json"));
@@ -30,11 +77,32 @@ const confirmPresence = (member, event) => {
 }
 const cancelPresence = (member, event) => {
     var currentEvent = JSON.parse(fs.readFileSync("events/" + event.id + ".json"));
-    currentEvent.confirmed.filter(n => n !== member.number);
+    currentEvent.confirmed = currentEvent.confirmed.filter(n => n !== member.number);
     fs.writeFileSync("events/" + event.id + ".json", JSON.stringify(currentEvent));
 }
 const memberInEvent = (member, event) => {
     return event.confirmed.find(con => con == member.number) != undefined;
+}
+const cancelEvent = (event) => {
+    var currentEvent = JSON.parse(fs.readFileSync("events/" + event.id + ".json"));
+    currentEvent.canceled = true;
+    fs.writeFileSync("events/" + event.id + ".json", JSON.stringify(currentEvent));
+}
+const uncancelEvent = (event) => {
+    var currentEvent = JSON.parse(fs.readFileSync("events/" + event.id + ".json"));
+    currentEvent.canceled = false;
+    fs.writeFileSync("events/" + event.id + ".json", JSON.stringify(currentEvent));
+}
+const getEventParticipants = (event) => {
+    var msgParticipants = "*PARTICIPANTES* do evento '" + event.name + "':";
+    for(var i=0; i<event.confirmed.length; i++)
+    {
+        const member = getMember(event.confirmed[i]);
+        const present = event.checkin.includes(member.number);
+
+        msgParticipants += `\n${i+1} - ${member.name} ${present ? "✅ Presente" : ""}`;
+    }
+    return msgParticipants;
 }
 const notificateAllMembers = (event) => {
     let members = getMembers();
@@ -46,10 +114,9 @@ const notificateAllMembers = (event) => {
             var _phoneId = await client.getNumberId(member.number)
             var _isValid = await client.isRegisteredUser(_phoneId._serialized)
             if(_isValid) {
-                client.sendMessage(_phoneId._serialized, `Olá ${member.name}! Evento novo do SharkRunners`);
-                client.sendMessage(_phoneId._serialized, eventString);
-                client.sendMessage(_phoneId._serialized, `Digite 1 para *confirmar presença*\nDigite 2 para negar a presença.`);
+                client.sendMessage(_phoneId._serialized, `*Olá ${member.name}! Evento novo do SharkRunners*\n${eventString}\n\nVocê deseja comparecer? Digite *Sim* ou *Não*`);
                 currentChat[_phoneId._serialized] = "event_response";
+                currentEvent[_phoneId._serialized] = event;
             }
             else
             {
@@ -75,8 +142,11 @@ const getEvents = () => {
     for(var i=0; i<eventsDir.length; i++)
     {
         const event = JSON.parse(fs.readFileSync("events/" + eventsDir[i]));
-        events.push(event);
+        const eventDate = new Date(event.date);
+        if (Date.now() < eventDate)
+            events.push(event);
     }
+    events = events.sort((a,b) => a.date < b.date);
     return events;
 }
 const listEvents = () => {
@@ -84,43 +154,212 @@ const listEvents = () => {
     var events = getEvents();
     for(var i=0; i<events.length; i++)
     {
-        eventsList += "\n" + (i+1) + " - " + events[i].name;
+        const date = new Date(events[i].date);
+        eventsList += `\n${i+1} - ${events[i].canceled ? "~" : ""}${events[i].name}, dia ${formatTwoDecimal(date.getDate())}/${formatTwoDecimal(date.getMonth())}/${formatTwoDecimal(date.getFullYear())} ${events[i].canceled ? "~ ❌ Cancelado" : ""}`;
     }
     return eventsList;
+}
+const afirmativeResponse = msg => {
+    const responses = ["s", "sim", "ss", "uhm", "sin", "si", "uhum", "yes", "ahm", "aham"];
+    var res = msg.body.toLowerCase();
+    return responses.includes(res);
+}
+const negativeResponse = msg => {
+    const responses = ["n", "nao", "ñ", "não", "no", "nop"];
+    var res = msg.body.toLowerCase();
+    return responses.includes(res);
 }
 
 var currentChat = {}
 var createEvent = {}
 var currentEvent = {}
 
-const adminCommands = msg => {
+const proccessMessage = async msg => {
+    let chat = await msg.getChat();
+    if (msg.body == "!ping")
+    {
+        chat.sendMessage(new Buttons("Teste",[{body: "btn1"}, {body: "btn2"}], "title", "footer"));
+        return;
+    }
+    if (msg.body.includes("!sticker"))
+    {
+        if(msg.hasMedia) {
+            const media = await msg.downloadMedia();
+            // do something with the media data here
+            chat.sendMessage(media, {sendMediaAsSticker: true });
+        }
+        else
+        {
+            msg.reply("Manda a foto, arrombado.");
+        }
+        return;
+    }
+    if (chat.isGroup) {
+        if (msg.body.includes("!participantes"))
+        {
+            const eventName = msg.body.replace("!participantes ", "");
+            const events = getEvents();
+            const event = events.find(ev => ev.name.toLowerCase().includes(eventName.toLowerCase()));
+            if (event)
+            {
+                msg.reply(getEventParticipants(event));
+                client.sendMessage(msg.from, "Quer participar desse evento? Entra em contato comigo (SharkBot) pelo privado.");
+            }
+        }
+        if (msg.body.includes("!evento"))
+        {
+            const eventName = msg.body.replace("!evento ", "");
+            const events = getEvents();
+            const event = events.find(ev => ev.name.toLowerCase().includes(eventName.toLowerCase()));
+            if (event)
+            {
+                msg.reply(eventStringify(event));
+            }
+        }
+        if (msg.body.includes("!eventos"))
+        {
+            msg.reply(listEvents());
+        }
+        if (msg.body.includes("!locais"))
+        {
+            let rawdata = fs.readFileSync('places.json');
+            const places = JSON.parse(rawdata);
+            var msgStr = "*LUGARES DE EVENTOS*";
+            for(var i=0; i<places.length; i++)
+            {
+                msgStr += `\n- ${places[i]}`;
+            }
+            msg.reply(msgStr);
+        }
+        if (msg.body.toLowerCase() == "!local aleatório" || msg.body.toLowerCase() == "!local aleatorio")
+        {
+            let rawdata = fs.readFileSync('places.json');
+            const places = JSON.parse(rawdata);
+            msg.reply(places[Math.floor(Math.random()*places.length)]);
+        }
+        if (msg.body.includes("!comandos"))
+        {
+            msg.reply("!evento [nome do evento]\n!participantes [nome do evento]\n!eventos\n!locais\n!local aleatório");
+        }
+        return;
+    }
+
+    if (msg.body == "!cancelar")
+    {
+        currentChat[msg.from] = undefined;
+        client.sendMessage(msg.from, "OK, cancelado");
+        return;
+    }
     const member = getMember(msg.from.split("@")[0]);
     if (msg.body == "!notificar evento")
     {
-        if (member.isAdmin)
+        if (member.role == "admin")
         {
             currentChat[msg.from] = "select_notify_event";
-            client.sendMessage(msg.from, `Olá ${member.name}!`);
             client.sendMessage(msg.from, "Qual seria o evento?");
             client.sendMessage(msg.from, listEvents());
         }
         else
         {
-            msg.reply("Desculpe, você não tem autorização para criar um evento");
+            msg.reply("Você não tem autorização para notificar um evento");
+        }
+        return;
+    }
+    if (msg.body == "!verificar evento")
+    {
+        if (member.role == "admin")
+        {
+            currentChat[msg.from] = "select_verify_event";
+            client.sendMessage(msg.from, "Qual seria o evento?");
+            client.sendMessage(msg.from, listEvents());
+        }
+        else
+        {
+            msg.reply("Você não tem autorização para notificar um evento");
+        }
+        return;
+    }
+    if (msg.body == "!checkin")
+    {
+        if (member.role == "admin" || member.role == "moderator")
+        {
+            currentChat[msg.from] = "checkin_event";
+            client.sendMessage(msg.from, "Qual seria o evento?");
+            client.sendMessage(msg.from, listEvents());
+        }
+        else
+        {
+            msg.reply("Você não tem autorização para fazer checkin");
+        }
+        return;
+    }
+    if (msg.body == "!checkout")
+    {
+        if (member.role == "admin" || member.role == "moderator")
+        {
+            currentChat[msg.from] = "checkout_event";
+            client.sendMessage(msg.from, "Qual seria o evento?");
+            client.sendMessage(msg.from, listEvents());
+        }
+        else
+        {
+            msg.reply("Você não tem autorização para fazer checkin");
+        }
+        return;
+    }
+    if (msg.body == "!cancelar evento")
+    {
+        if (member.role == "admin")
+        {
+            currentChat[msg.from] = "cancel_event";
+            client.sendMessage(msg.from, "Qual seria o evento?");
+            client.sendMessage(msg.from, listEvents());
+        }
+        else
+        {
+            msg.reply("Você não tem autorização para cancelar um evento");
+        }
+        return;
+    }
+    if (msg.body == "!descancelar evento")
+    {
+        if (member.role == "admin")
+        {
+            currentChat[msg.from] = "descancel_event";
+            client.sendMessage(msg.from, "Qual seria o evento?");
+            client.sendMessage(msg.from, listEvents());
+        }
+        else
+        {
+            msg.reply("Você não tem autorização para descancelar um evento");
         }
         return;
     }
     if (msg.body == "!criar evento")
     {
-        if (member.isAdmin)
+        if (member.role == "admin")
         {
             currentChat[msg.from] = "create_event_name";
-            client.sendMessage(msg.from, `Olá ${member.name}!`);
+            createEvent = {};
             client.sendMessage(msg.from, "Qual seria o nome do evento?");
         }
         else
         {
-            msg.reply("Desculpe, você não tem autorização para criar um evento");
+            msg.reply("Você não tem autorização para criar um evento");
+        }
+        return;
+    }
+    if (msg.body == "!editar evento")
+    {
+        if (member.role == "admin")
+        {
+            currentChat[msg.from] = "edit_event";
+            client.sendMessage(msg.from, "Qual seria o evento?");
+            client.sendMessage(msg.from, listEvents());
+        }
+        else
+        {
+            msg.reply("Você não tem autorização para editar um evento");
         }
         return;
     }
@@ -129,43 +368,120 @@ const adminCommands = msg => {
     if (currentChat[msg.from] == "create_event_name")
     {
         createEvent.name = msg.body;
-        client.sendMessage(msg.from, "Certo, e a data?");
+        client.sendMessage(msg.from, "Certo, e a data? Insira no padrão (DD/MM/AAAA)");
+        if (createEvent.date)
+        {
+            const date = new Date(createEvent.date);
+            client.sendMessage(msg.from, `Atual: ${formatTwoDecimal(date.getDate())}/${formatTwoDecimal(date.getMonth())}/${formatTwoDecimal(date.getFullYear())}`);
+        }
         currentChat[msg.from] = "create_event_date";
         return;
     }
     if (currentChat[msg.from] == "create_event_date")
     {
-        createEvent.date = msg.body;
-        client.sendMessage(msg.from, "OK, o local?");
-        currentChat[msg.from] = "create_event_local";
+        const date = msg.body.split('/');
+        if (date.length == 3)
+        {
+            client.sendMessage(msg.from, `Será dia ${date[0]} então, que horas? Insira no padrão (HH:MM)`);
+            if (createEvent.date)
+            {
+                const date = new Date(createEvent.date);
+                client.sendMessage(msg.from, `Atual: ${formatTwoDecimal(date.getHours())}:${formatTwoDecimal(date.getMinutes())}`);
+            }
+            createEvent.date = date;
+            currentChat[msg.from] = "create_event_hour";
+        }
+        else
+        {
+            client.sendMessage(msg.from, `Formato inválido, use (DD/MM/AAAA)`);
+        }
+        return;
+    }
+    if (currentChat[msg.from] == "create_event_hour")
+    {
+        const hour = msg.body.split(':');
+        if (hour.length == 2)
+        {
+            const date = new Date(parseInt(createEvent.date[2]), parseInt(createEvent.date[1]), parseInt(createEvent.date[0]), parseInt(hour[0]), parseInt(hour[1]));
+            createEvent.date = date.toUTCString();
+            client.sendMessage(msg.from, "OK, o local? (Digite *Aleatorio* caso queira que o local do evento seja aleatório)");
+            if (createEvent.local)
+            {
+                client.sendMessage(msg.from, `Atual: ${createEvent.local}`);
+            }
+            currentChat[msg.from] = "create_event_local";
+            return;
+        }
+        else
+        {
+            client.sendMessage(msg.from, `Formato inválido, use (HH:MM)`);
+        }
         return;
     }
     if (currentChat[msg.from] == "create_event_local")
     {
-        createEvent.local = msg.body;
-        createEvent.id = uuidv4();
-        createEvent.confirmed = [];
-        client.sendMessage(msg.from, "Evento criado, deseja novitificar todos os membros?\n1 - para SIM\n2 - para NÃO");
+        if (msg.body.toLowerCase() == "aleatorio" || msg.body.toLowerCase() == "aleatório")
+        {
+            let rawdata = fs.readFileSync('places.json');
+            const places = JSON.parse(rawdata);
+            createEvent.local = places[Math.floor(Math.random()*places.length)];
+            msg.reply("O local será *" + createEvent.local + "*");
+        }
+        else
+        {
+            createEvent.local = msg.body;
+        }
+
+        if (createEvent.id == undefined)
+        {
+            createEvent.id = uuidv4();
+            createEvent.confirmed = [];
+            createEvent.checkin = [];
+            createEvent.canceled = false;
+            client.sendMessage(msg.from, "Evento criado, deseja notificar todos os membros?\ndigite *Sim* ou *Não*");
+        }
+        else
+        {
+            client.sendMessage(msg.from, "Evento editado, deseja notificar todos os membros?\ndigite *Sim* ou *Não*");
+        }
         currentChat[msg.from] = "create_event_notificate";
         fs.writeFileSync("events/" + createEvent.id + ".json", JSON.stringify(createEvent));
         return;
     }
     if (currentChat[msg.from] == "create_event_notificate")
     {
-        if (msg.body == "1")
+        if (afirmativeResponse(msg))
         {
             notificateAllMembers(createEvent)
             client.sendMessage(msg.from, "Notificado!");
             currentChat[msg.from] = undefined;
         }
-        else if (msg.body == "2")
+        else if (negativeResponse(msg))
         {
             client.sendMessage(msg.from, "Certo.");
             currentChat[msg.from] = undefined;
         }
         else 
         {
-            client.sendMessage(msg.from, "Desculpe, não entendi, digite:\n1 - para SIM\n2 - para NÃO");
+            client.sendMessage(msg.from, "Desculpe, não entendi, digite *Sim* ou *Não*");
+        }
+        return;
+    }
+    //Edit event
+    if (currentChat[msg.from] == "edit_event")
+    {
+        const selectedId = parseInt(msg.body);
+        const events = getEvents();
+        if (events[selectedId - 1])
+        {
+            createEvent = events[selectedId - 1]
+            client.sendMessage(msg.from, "Qual seria o nome do evento?");
+            client.sendMessage(msg.from, "Atual: " + createEvent.name);
+            currentChat[msg.from] = "create_event_name";
+        }
+        else
+        {
+            client.sendMessage(msg.from, "Evento inválido");
         }
         return;
     }
@@ -174,36 +490,160 @@ const adminCommands = msg => {
     {
         const selectedId = parseInt(msg.body);
         const events = getEvents();
-        if (events[selectedId + 1])
+        if (events[selectedId - 1])
         {
-            createEvent = events[selectedId + 1];
+            notificateAllMembers(events[selectedId - 1]);
             client.sendMessage(msg.from, "Membros notificados!");
-            notificateAllMembers(createEvent);
             currentChat[msg.from] = undefined;
         }
         else
         {
             client.sendMessage(msg.from, "Evento inválido");
         }
+        return;
     }
-}
-const mainCommands = msg => {
+    //Checkin
+    if (currentChat[msg.from] == "checkin_event")
+    {
+        const selectedId = parseInt(msg.body);
+        const events = getEvents();
+        const event = events[selectedId - 1]
+        if (event)
+        {
+            var msgParticipants = getEventParticipants(event); 
+            client.sendMessage(msg.from, "Qual seria o membro?");
+            client.sendMessage(msg.from, msgParticipants);
+            currentEvent[msg.from] = event;
+            currentChat[msg.from] = "checkin_member";
+        }
+        else
+        {
+            client.sendMessage(msg.from, "Evento inválido");
+        }
+        return;
+    }
+    if (currentChat[msg.from] == "checkin_member")
+    {
+        const selectedId = parseInt(msg.body);
+        const participant = currentEvent[msg.from].confirmed[selectedId - 1]
+        if (participant)
+        {
+            const member = getMember(participant);
+            checkinMemberPresence(member, currentEvent[msg.from]);
+            client.sendMessage(msg.from, `Check-in de ${member.name} feito.`);
+            currentChat[msg.from] = undefined;
+        }
+        else
+        {
+            client.sendMessage(msg.from, "Membro inválido");
+        }
+        return;
+    }
+    //Checkout
+    if (currentChat[msg.from] == "checkout_event")
+    {
+        const selectedId = parseInt(msg.body);
+        const events = getEvents();
+        const event = events[selectedId - 1]
+        if (event)
+        {
+            var msgParticipants = getEventParticipants(event); 
+            client.sendMessage(msg.from, "Qual seria o membro?");
+            client.sendMessage(msg.from, msgParticipants);
+            currentEvent[msg.from] = event;
+            currentChat[msg.from] = "checkout_member";
+        }
+        else
+        {
+            client.sendMessage(msg.from, "Evento inválido");
+        }
+        return;
+    }
+    if (currentChat[msg.from] == "checkout_member")
+    {
+        const selectedId = parseInt(msg.body);
+        const participant = currentEvent[msg.from].confirmed[selectedId - 1]
+        if (participant)
+        {
+            const member = getMember(participant);
+            checkoutMemberPresence(member, currentEvent[msg.from]);
+            client.sendMessage(msg.from, `Check-out de ${member.name} feito.`);
+            currentChat[msg.from] = undefined;
+        }
+        else
+        {
+            client.sendMessage(msg.from, "Membro inválido");
+        }
+        return;
+    }
+    //Verify event
+    if (currentChat[msg.from] == "select_verify_event")
+    {
+        const selectedId = parseInt(msg.body);
+        const events = getEvents();
+        const event = events[selectedId - 1]
+        if (event)
+        {
+            var msgParticipants = getEventParticipants(event); 
+            client.sendMessage(msg.from, msgParticipants);
+            currentChat[msg.from] = undefined;
+        }
+        else
+        {
+            client.sendMessage(msg.from, "Evento inválido");
+        }
+        return;
+    }
+    //Cancel event
+    if (currentChat[msg.from] == "cancel_event")
+    {
+        const selectedId = parseInt(msg.body);
+        const events = getEvents();
+        const event = events[selectedId - 1]
+        if (event)
+        {
+            cancelEvent(event);
+            client.sendMessage(msg.from, "Evento cancelado!");
+            currentChat[msg.from] = undefined;
+        }
+        else
+        {
+            client.sendMessage(msg.from, "Evento inválido");
+        }
+        return;
+    }
+    //Uncancel event
+    if (currentChat[msg.from] == "descancel_event")
+    {
+        const selectedId = parseInt(msg.body);
+        const events = getEvents();
+        const event = events[selectedId - 1]
+        if (event)
+        {
+            uncancelEvent(event);
+            client.sendMessage(msg.from, "Evento descancelado!");
+            currentChat[msg.from] = undefined;
+        }
+        else
+        {
+            client.sendMessage(msg.from, "Evento inválido");
+        }
+        return;
+    }
+    //Main
     if (currentChat[msg.from] == undefined)
     {
         const member = getMember(msg.from.split("@")[0]);
-        if (member)
+        if (member.isSharker)
         {
             client.sendMessage(msg.from, `Olá ${member.name}!`);
-            client.sendMessage(msg.from, `O que você deseja?\n\n1 - Lista de eventos\n2 - Minhas presenças`);
-            if (member.isAdmin)
-            {
-                client.sendMessage(msg.from, "Vi também que você é ADM, aqui alguns comandos:\n\n!criar evento - Criar evento\n!notificar evento - Notificar todos os membros de um evento");
-            }
+            client.sendMessage(msg.from, `O que você deseja?\n\n1 - Lista de eventos\n2 - Minhas presenças\n${member.role == "admin" ? "!ADM - Comandos de Administrador" : ""}\n\nDigite o número correspondente`);
             currentChat[msg.from] = "main_response";
         }
         else
         {
-            client.sendMessage(msg.from, `Olá, você não está na lista de membros, converse com um administrador.`);
+            client.sendMessage(msg.from, `Olá, você não está na lista de membros, converse com um administrador.\nSe você já é membro do *SharkRunners*, por favor aguarde até lhe adicionar no banco de dados.`);
+            currentChat[msg.from] = undefined;
         }
         return;
     }
@@ -213,13 +653,18 @@ const mainCommands = msg => {
         const member = getMember(msg.from.split("@")[0]);
         if (msg.body == "1")
         {
-            client.sendMessage(msg.from, listEvents());
+            client.sendMessage(msg.from, listEvents() + "\n\nDigite o número correspondente do evento para informações\nou você pode *!cancelar*");
             currentChat[msg.from] = "main_select_event";
         }
         else if (msg.body == "2")
         {
             client.sendMessage(msg.from, listPresences(member));
             client.sendMessage(msg.from, "Para confirmar a presença em um evento, vá até a lista de eventos no menu principal.");
+            currentChat[msg.from] = undefined;
+        }
+        else if (msg.body.toLowerCase() == "!adm")
+        {
+            client.sendMessage(msg.from, "!criar evento - Criar evento\n!editar evento - Editar um evento\n!notificar evento - Notificar todos os membros de um evento\n!verificar evento - Verificar lista de confirmados\n!cancelar evento - Cancelar um evento\n!descancelar evento - Descancelar um evento\n\nVocê pode *!cancelar* um comando a qualquer momento.");
             currentChat[msg.from] = undefined;
         }
         else 
@@ -234,23 +679,23 @@ const mainCommands = msg => {
         const member = getMember(msg.from.split("@")[0]);
         const selectedId = parseInt(msg.body);
         const events = getEvents();
-        if (events[selectedId + 1])
+        if (events[selectedId - 1])
         {
-            currentEvent[msg.from] = events[selectedId + 1];
+            currentEvent[msg.from] = events[selectedId - 1];
+
             client.sendMessage(msg.from, eventStringify(currentEvent[msg.from]));
             const confirmed = currentEvent[msg.from].confirmed.find(con => con == member.number) != undefined;
             
             if (confirmed)
             {
-                client.sendMessage(msg.from, "Você já está confirmado nesse evento, deseja cancelar?\n\n1 - para SIM\n2 - para NÃO");
+                client.sendMessage(msg.from, "Você já está confirmado nesse evento, deseja cancelar?\n\ndigite *Sim* ou *Não*");
                 currentChat[msg.from] = "main_select_event_cancel_presence";
             }
             else
             {
-                client.sendMessage(msg.from, "Você não está confirmado nesse evento, deseja participar?\n\n1 - para SIM\n2 - para NÃO");
+                client.sendMessage(msg.from, "Você não está confirmado nesse evento, deseja participar?\n\ndigite *Sim* ou *Não*");
                 currentChat[msg.from] = "main_select_event_confirm_presence";
             }
-            currentChat[msg.from] = undefined;
         }
         else
         {
@@ -261,68 +706,64 @@ const mainCommands = msg => {
     if (currentChat[msg.from] == "main_select_event_confirm_presence")
     {
         const member = getMember(msg.from.split("@")[0]);
-        if (msg.body == "1")
+        if (afirmativeResponse(msg))
         {
             confirmPresence(member, currentEvent[msg.from]);
-            client.sendMessage(msg.from, "OK, Cancelado!");
+            client.sendMessage(msg.from, "OK, presença confirmada!");
             currentChat[msg.from] = undefined;
         }
-        else if (msg.body == "2")
+        else if (negativeResponse(msg))
         {
             client.sendMessage(msg.from, "bele!");
             currentChat[msg.from] = undefined;
         }
         else 
         {
-            client.sendMessage(msg.from, "Desculpe, não entendi, digite:\n1 - para SIM\n2 - para NÃO");
+            client.sendMessage(msg.from, "Desculpe, não entendi, digite *Sim* ou *Não*");
         }
         return;
     }
     if (currentChat[msg.from] == "main_select_event_cancel_presence")
     {
         const member = getMember(msg.from.split("@")[0]);
-        if (msg.body == "1")
+        if (afirmativeResponse(msg))
         {
             cancelPresence(member, currentEvent[msg.from]);
             client.sendMessage(msg.from, "OK, Cancelado!");
             currentChat[msg.from] = undefined;
         }
-        else if (msg.body == "2")
+        else if (negativeResponse(msg))
         {
             client.sendMessage(msg.from, "bele!");
             currentChat[msg.from] = undefined;
         }
         else 
         {
-            client.sendMessage(msg.from, "Desculpe, não entendi, digite:\n1 - para SIM\n2 - para NÃO");
+            client.sendMessage(msg.from, "Desculpe, não entendi, digite *Sim* ou *Não*");
         }
         return;
     }
     //Event presence
     if (currentChat[msg.from] == "event_response")
     {
-        if (msg.body == "1")
+        if (afirmativeResponse(msg))
         {
             const member = getMember(msg.from.split("@")[0]);
-            confirmPresence(member, createEvent);
+            confirmPresence(member, currentEvent[msg.from]);
             client.sendMessage(msg.from, "Certo, bom evento!");
             currentChat[msg.from] = undefined;
         }
-        else if (msg.body == "2")
+        else if (negativeResponse(msg))
         {
             client.sendMessage(msg.from, "Então vai tomar no cu 💓");
             currentChat[msg.from] = undefined;
         }
         else 
         {
-            client.sendMessage(msg.from, "Desculpe, não entendi, digite:\n1 - para SIM\n2 - para NÃO");
+            client.sendMessage(msg.from, "Desculpe, não entendi, é *Sim* ou *Não*?");
         }
         return;
     }
-}
-const proccessMessage = msg => {
-    adminCommands(msg);
-    mainCommands(msg);
 }
 
 client.on('message', proccessMessage);
