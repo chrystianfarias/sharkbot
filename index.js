@@ -176,6 +176,7 @@ var currentEvent = {}
 
 const proccessMessage = async msg => {
     let chat = await msg.getChat();
+    const member = getMember(msg.from.split("@")[0]);
     if (msg.body == "!ping")
     {
         chat.sendMessage(new Buttons("Teste",[{body: "btn1"}, {body: "btn2"}], "title", "footer"));
@@ -241,6 +242,29 @@ const proccessMessage = async msg => {
         {
             msg.reply("!evento [nome do evento]\n!participantes [nome do evento]\n!eventos\n!locais\n!local aleatório");
         }
+        if(msg.body === '!todos') {
+            const senderContact = await msg.getContact();
+            const member = getMember(senderContact.number.split("@")[0]);
+            let text = "";
+            let mentions = [];
+            if (member.role == "admin")
+            {
+    
+                for(let participant of chat.participants) {
+                    const contact = await client.getContactById(participant.id._serialized);
+                    
+                    mentions.push(contact);
+                    text += `@${participant.id.user} `;
+                }
+        
+                await chat.sendMessage(text, { mentions });
+            }
+            else
+            {
+                msg.reply("Você não é ADM");
+            }
+        }
+        
         return;
     }
 
@@ -250,7 +274,6 @@ const proccessMessage = async msg => {
         client.sendMessage(msg.from, "OK, cancelado");
         return;
     }
-    const member = getMember(msg.from.split("@")[0]);
     if (msg.body == "!notificar evento")
     {
         if (member.role == "admin")
@@ -642,7 +665,9 @@ const proccessMessage = async msg => {
         }
         else
         {
-            client.sendMessage(msg.from, `Olá, você não está na lista de membros, converse com um administrador.\nSe você já é membro do *SharkRunners*, por favor aguarde até lhe adicionar no banco de dados.`);
+            const contact = await client.getContactById('554884891617@c.us')
+            client.sendMessage(msg.from, `Olá, você não está na lista de membros, converse com o Chrystian para te adicionar no banco de dados.`);
+            client.sendMessage(msg.from, contact)
             currentChat[msg.from] = undefined;
         }
         return;
