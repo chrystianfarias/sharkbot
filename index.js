@@ -2,9 +2,10 @@ const { Client, LocalAuth, Buttons } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const { maxHeaderSize } = require('http');
 
 const client = new Client({
-    ffmpegPath: "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
+    ffmpegPath: "/Applications/ffmpeg",
     authStrategy: new LocalAuth({
       clientId: "client-one"
     }),
@@ -20,9 +21,34 @@ client.on('qr', (qr) => {
 client.on('ready', async () => {
     console.log('Client is ready!');
     const ver = await client.getWWebVersion();
-    console.log(ver);
 });
+const addMember = async(member) => {
+    var members = getMembers();
+    const existsMember = members.find(m => m.number == member.number);
+    if (!existsMember)
+    {
+        members.push(member);
+        fs.writeFileSync("members.json", JSON.stringify(members));
+        
+        var _phoneId = await client.getNumberId(member.number)
+        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
+        var str = "membro";
+        if (member.role == "moderador")
+            str = "moderador";
+        if (member.role == "admin")
+            str = "ADM";
+        if (member.role == "guest")
+            str = "convidado";
 
+        if (_isValid)
+            client.sendMessage(_phoneId._serialized, `Olá ${member.name}, seu número foi cadastrado no bot do *SharkRunners* como ` + str);
+    }
+}
+const banMember = (number) => {
+    var members = getMembers();
+    members = members.filter(m => m.number != number);
+    fs.writeFileSync("members.json", JSON.stringify(members));
+}
 const getMembers = () => {
     let rawdata = fs.readFileSync('members.json');
     return JSON.parse(rawdata);
@@ -31,14 +57,12 @@ const getMember = (number) => {
     let members = getMembers();
     const member = members.find(m => m.number == number);
     if (member)
-    {
-        member.isSharker = true;
         return member;
-    }
     else
         return {
             name: number,
-            number: number
+            number: number,
+            role: "unknown"
         }
 }
 const formatTwoDecimal = (number) => {
@@ -99,8 +123,14 @@ const getEventParticipants = (event) => {
     {
         const member = getMember(event.confirmed[i]);
         const present = event.checkin.includes(member.number);
-
-        msgParticipants += `\n${i+1} - ${member.name} ${present ? "✅ Presente" : ""}`;
+        var guestStr = "";
+        if (member.role == "guest")
+        {
+            const memberFriend = getMember(member.friend);
+            guestStr = `(Convidado de ${memberFriend.name})`;
+        }
+        msgParticipants += `\n${i+1} - ${member.name} ${guestStr} ${present ? "✅ Presente" : ""}`;
+        
     }
     return msgParticipants;
 }
@@ -108,6 +138,8 @@ const notificateAllMembers = (event) => {
     let members = getMembers();
     let eventString = eventStringify(event);
     members.forEach(async member => {
+        if (member.role == "guest")
+            return;
         let inEvent = memberInEvent(member, event);
         if (inEvent == false)
         {
@@ -149,11 +181,17 @@ const getEvents = () => {
     events = events.sort((a,b) => a.date < b.date);
     return events;
 }
-const listEvents = () => {
+const listEvents = (isMember = true) => {
     var eventsList = "*EVENTOS*";
     var events = getEvents();
     for(var i=0; i<events.length; i++)
     {
+        if (isMember == false)
+            if (events[i].memberonly == true)
+            {
+                eventsList += `\n${i+1} - ~Evento para membros~`;
+                continue;
+            }
         const date = new Date(events[i].date);
         eventsList += `\n${i+1} - ${events[i].canceled ? "~" : ""}${events[i].name}, dia ${formatTwoDecimal(date.getDate())}/${formatTwoDecimal(date.getMonth())}/${formatTwoDecimal(date.getFullYear())} ${events[i].canceled ? "~ ❌ Cancelado" : ""}`;
     }
@@ -171,8 +209,12 @@ const negativeResponse = msg => {
 }
 
 var currentChat = {}
-var createEvent = {}
 var currentEvent = {}
+
+var createEvent = {}
+var createMember = {}
+
+var participateMessage = {}
 
 const proccessMessage = async msg => {
     let chat = await msg.getChat();
@@ -204,7 +246,8 @@ const proccessMessage = async msg => {
             if (event)
             {
                 msg.reply(getEventParticipants(event));
-                client.sendMessage(msg.from, "Quer participar desse evento? Entra em contato comigo (SharkBot) pelo privado.");
+                const msgReply = await client.sendMessage(msg.from, "Quer participar desse evento? Responda essa mensagem com *Sim*");
+                participateMessage[msgReply.id] = event;
             }
         }
         if (msg.body.includes("!evento"))
@@ -215,6 +258,27 @@ const proccessMessage = async msg => {
             if (event)
             {
                 msg.reply(eventStringify(event));
+            }
+        }
+        if (msg.body == "!atualizar membros")
+        {
+            const senderContact = await msg.getContact();
+            const member = getMember(senderContact.number.split("@")[0]);
+            if (member.role == "admin")
+            {
+                for(let participant of chat.participants) {
+                    var con = await client.getContactById(participant.id._serialized);
+                    addMember({
+                        name: con.pushname ?? con.number + " (sem nome)",
+                        number: con.number,
+                        role: "member"
+                    })
+                }
+                msg.reply("Membros atualizados no banco de dados do bot.");
+            }
+            else
+            {
+                msg.reply("Só para admins amiguinho.");
             }
         }
         if (msg.body.includes("!eventos"))
@@ -264,7 +328,31 @@ const proccessMessage = async msg => {
                 msg.reply("Você não é ADM");
             }
         }
-        
+        const quote = await msg.getQuotedMessage();
+        if (quote)
+        {
+            if (afirmativeResponse(msg))
+            {
+                if (participateMessage[quote.id])
+                {
+                    const senderContact = await msg.getContact();
+                    const member = getMember(senderContact.number.split("@")[0]);
+                    const confirmed = participateMessage[quote.id].confirmed.find(con => con == member.number) != undefined;
+
+                    if (confirmed)
+                    {
+                        msg.reply("Sua presença já foi confirmada.");
+                        return;
+                    }
+                    confirmPresence(member, participateMessage[quote.id]);
+                    msg.reply("Sua presença no evento foi confirmada " + member.name);
+                }
+                else
+                {
+                    msg.reply("O tempo pra responder a essa pergunta expirou, me chama no privado para confirmar.");
+                }
+            }
+        }
         return;
     }
 
@@ -386,7 +474,117 @@ const proccessMessage = async msg => {
         }
         return;
     }
+    //Add member
+    if (msg.body == "!add membro")
+    {
+        if (member.role == "admin")
+        {
+            currentChat[msg.from] = "add_member_name";
+            createMember = {};
+            client.sendMessage(msg.from, "Qual é o nome?");
+        }
+        else
+        {
+            msg.reply("Você não tem autorização para adicionar um membro");
+        }
+        return;
+    }
+    if (currentChat[msg.from] == "add_member_name")
+    {
+        createMember.name = msg.body;
+        currentChat[msg.from] = "add_member_number";
+        client.sendMessage(msg.from, "Qual é o número? Digite no padrão (5548XXXXXXXX), ex: 554884891617");
+        client.sendMessage(msg.from, "Verifique se o número do whatsapp dessa pessoa possúi o 9 na frente.");
+        return;
+    }
+    if (currentChat[msg.from] == "add_member_number")
+    {
+        var _phoneId = await client.getNumberId(msg.body)
+        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
+        if(_isValid)
+        {
+            createMember.number = msg.body;
+            currentChat[msg.from] = "add_member_role";
+            client.sendMessage(msg.from, "Qual é o cargo?");
+            client.sendMessage(msg.from, "*1* - Membro\n*2* - Moderador\n*3* - Convidado\n\nDigite o número correspondente");
+        }
+        else
+        {
+            client.sendMessage(msg.from, "Número inválido!");
+        }
+        return;
+    }
+    if (currentChat[msg.from] == "add_member_role")
+    {
+        if (msg.body == "1")
+        {
+            createMember.role = "member";
+        }
+        else if (msg.body == "2")
+        {
+            createMember.role = "moderador";
+        }
+        else if (msg.body == "3")
+        {
+            createMember.role = "guest";
+            currentChat[msg.from] = "add_member_friend";
+            client.sendMessage(msg.from, "Qual é o número do membro amigo do convidado? Digite no padrão (5548XXXXXXXX), ex: 554884891617");
+            return;
+        }
+        addMember(createMember);
+        client.sendMessage(msg.from, "Membro criado!");
+        currentChat[msg.from] = undefined;
+        return;
+    }
+    if (currentChat[msg.from] == "add_member_friend")
+    {
+        var _phoneId = await client.getNumberId(msg.body)
+        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
+        if(_isValid)
+        {
+            createMember.friend = msg.body;
+            currentChat[msg.from] = undefined;
+            addMember(createMember);
+            client.sendMessage(msg.from, "Membro criado!");
+        }
+        else 
+        {
+            client.sendMessage(msg.from, "Número inválido!");
+        }
+        return;
+    }
+    //Ban member
 
+    if (msg.body == "!ban membro")
+    {
+        if (member.role == "admin")
+        {
+            currentChat[msg.from] = "ban_member_number";
+            createMember = {};
+            client.sendMessage(msg.from, "Qual é o número?");
+        }
+        else
+        {
+            msg.reply("Você não tem autorização para banir um membro");
+        }
+        return;
+    }
+    if (currentChat[msg.from] == "ban_member_number")
+    {
+        var _phoneId = await client.getNumberId(msg.body)
+        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
+        if(_isValid)
+        {
+            banMember(msg.body);
+            client.sendMessage(msg.from, "Membro banido.");
+            currentChat[msg.from] = undefined;
+        }
+        else
+        {
+            client.sendMessage(msg.from, "Número inválido!");
+        }
+        return;
+    }
     //Create event
     if (currentChat[msg.from] == "create_event_name")
     {
@@ -453,6 +651,25 @@ const proccessMessage = async msg => {
         else
         {
             createEvent.local = msg.body;
+        }
+        client.sendMessage(msg.from, "O evento é apenas para membros?\ndigite *Sim* ou *Não*");
+        currentChat[msg.from] = "create_event_private";
+        return;
+    }
+    if (currentChat[msg.from] == "create_event_private")
+    {
+        if (afirmativeResponse(msg))
+        {
+            createEvent.memberonly = true;
+        }
+        else if (negativeResponse(msg))
+        {
+            createEvent.memberonly = false;
+        }
+        else 
+        {
+            client.sendMessage(msg.from, "Desculpe, não entendi, digite *Sim* ou *Não*");
+            return;
         }
 
         if (createEvent.id == undefined)
@@ -657,17 +874,24 @@ const proccessMessage = async msg => {
     if (currentChat[msg.from] == undefined)
     {
         const member = getMember(msg.from.split("@")[0]);
-        if (member.isSharker)
+        if (member.role != "unknown")
         {
             client.sendMessage(msg.from, `Olá ${member.name}!`);
-            client.sendMessage(msg.from, `O que você deseja?\n\n*1* - Lista de eventos 📅\n*2* - Minhas presenças ✅${member.role == "admin" ? "\n*!adm* - Comandos de Administrador ⚙️" : ""}\n\nDigite o *número correspondente*`);
-            currentChat[msg.from] = "main_response";
+            if (member.role != "guest")
+            {
+                client.sendMessage(msg.from, `O que você deseja?\n\n*1* - Lista de eventos 📅\n*2* - Minhas presenças ✅${member.role == "admin" ? "\n*!adm* - Comandos de Administrador ⚙️" : ""}\n\nDigite o *número correspondente*`);
+                currentChat[msg.from] = "main_response";
+            }
+            else
+            {
+                client.sendMessage(msg.from, `Você não é membro do grupo, mas aqui está alguns eventos que você pode participar`);
+                client.sendMessage(msg.from, listEvents(false) + "\n\nDigite o número correspondente do evento para informações\nou você pode *!cancelar*");
+                currentChat[msg.from] = "main_select_event";
+            }
         }
         else
         {
-            const contact = await client.getContactById('554884891617@c.us')
-            client.sendMessage(msg.from, `Olá, você não está na lista de membros, converse com o Chrystian para te adicionar no banco de dados.`);
-            client.sendMessage(msg.from, contact)
+            client.sendMessage(msg.from, `Olá, você não está na lista de membros, entre em contato com os administradores.`);
             currentChat[msg.from] = undefined;
         }
         return;
@@ -707,6 +931,12 @@ const proccessMessage = async msg => {
         const events = getEvents();
         if (events[selectedId - 1])
         {
+            if (events[selectedId - 1].memberonly == true && member.role == "guest")
+            {
+                client.sendMessage(msg.from, "Esse evento é apenas para membros 😔");
+                currentChat[msg.from] = undefined;
+                return;
+            }
             currentEvent[msg.from] = events[selectedId - 1];
 
             client.sendMessage(msg.from, eventStringify(currentEvent[msg.from]));
@@ -792,6 +1022,14 @@ const proccessMessage = async msg => {
     }
 }
 
-client.on('message', proccessMessage);
+client.on('message', (msg) => {
+    try {
+        proccessMessage(msg);
+    }
+    catch
+    {
+        client.sendMessage(msg.from, "❌ *ERRO* ❌\n\nOcorreu algum erro sério no seu comando. Quase morri. Tenta de novo ou contate um administrador.");
+    }
+});
 
 client.initialize();
