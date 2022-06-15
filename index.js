@@ -660,7 +660,7 @@ const proccessMessage = async msg => {
         if (member.isSharker)
         {
             client.sendMessage(msg.from, `Olá ${member.name}!`);
-            client.sendMessage(msg.from, `O que você deseja?\n\n1 - Lista de eventos\n2 - Minhas presenças\n${member.role == "admin" ? "!ADM - Comandos de Administrador" : ""}\n\nDigite o número correspondente`);
+            client.sendMessage(msg.from, `O que você deseja?\n\n*1* - Lista de eventos 📅\n*2* - Minhas presenças ✅${member.role == "admin" ? "\n*!adm* - Comandos de Administrador ⚙️" : ""}\n\nDigite o *número correspondente*`);
             currentChat[msg.from] = "main_response";
         }
         else
@@ -670,6 +670,12 @@ const proccessMessage = async msg => {
             client.sendMessage(msg.from, contact)
             currentChat[msg.from] = undefined;
         }
+        return;
+    }
+    if (msg.body.toLowerCase() == "!adm")
+    {
+        client.sendMessage(msg.from, "!criar evento - Criar evento\n!editar evento - Editar um evento\n!notificar evento - Notificar todos os membros de um evento\n!verificar evento - Verificar lista de confirmados\n!cancelar evento - Cancelar um evento\n!descancelar evento - Descancelar um evento\n!checkin - fazer o Check-in de um membro em um evento\n!checkout - fazer o Check-out de um membro em um evento\n\nVocê pode *!cancelar* um comando a qualquer momento.");
+        currentChat[msg.from] = undefined;
         return;
     }
     //Main
@@ -685,11 +691,6 @@ const proccessMessage = async msg => {
         {
             client.sendMessage(msg.from, listPresences(member));
             client.sendMessage(msg.from, "Para confirmar a presença em um evento, vá até a lista de eventos no menu principal.");
-            currentChat[msg.from] = undefined;
-        }
-        else if (msg.body.toLowerCase() == "!adm")
-        {
-            client.sendMessage(msg.from, "!criar evento - Criar evento\n!editar evento - Editar um evento\n!notificar evento - Notificar todos os membros de um evento\n!verificar evento - Verificar lista de confirmados\n!cancelar evento - Cancelar um evento\n!descancelar evento - Descancelar um evento\n\nVocê pode *!cancelar* um comando a qualquer momento.");
             currentChat[msg.from] = undefined;
         }
         else 
