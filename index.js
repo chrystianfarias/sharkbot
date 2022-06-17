@@ -81,8 +81,7 @@ const checkinMemberPresence = async (member, event) => {
     var _isValid = await client.isRegisteredUser(_phoneId._serialized)
     if(_isValid) {
         client.sendMessage(_phoneId._serialized, `Olá ${member.name}, seu check-in no evento '${event.name}' foi feito ✅`);
-        currentChat[_phoneId._serialized] = "event_response";
-        currentEvent[_phoneId._serialized] = event;
+        currentChat[_phoneId._serialized] = undefined;
     }
     else
     {
@@ -141,6 +140,31 @@ const notificateAllMembers = (event) => {
         if (member.role == "guest")
             return;
         let inEvent = memberInEvent(member, event);
+        if (inEvent)
+        {
+            var _phoneId = await client.getNumberId(member.number)
+            var _isValid = await client.isRegisteredUser(_phoneId._serialized)
+            if(_isValid) {
+                const date = new Date(event.date);
+                client.sendMessage(_phoneId._serialized, `Olá ${member.name}! O evento '${event.name}' é hoje, sua presença está confirmada! Não esquece de marcar na agenda:`);
+                client.sendMessage(_phoneId._serialized, `${event.name} no ${event.local} dia ${formatTwoDecimal(date.getDate())}/${formatTwoDecimal(date.getMonth())}/${formatTwoDecimal(date.getFullYear())} às ${formatTwoDecimal(date.getHours())}:${formatTwoDecimal(date.getMinutes())}`);
+                //currentChat[_phoneId._serialized] = "event_response";
+                //currentEvent[_phoneId._serialized] = event;
+            }
+            else
+            {
+                console.error(`O número do ${member.name} é invalido! (${member.number})`);
+            }
+        }
+    });
+}
+/*const notificateAllMembers = (event) => {
+    let members = getMembers();
+    let eventString = eventStringify(event);
+    members.forEach(async member => {
+        if (member.role == "guest")
+            return;
+        let inEvent = memberInEvent(member, event);
         if (inEvent == false)
         {
             var _phoneId = await client.getNumberId(member.number)
@@ -156,7 +180,7 @@ const notificateAllMembers = (event) => {
             }
         }
     });
-}
+}*/
 const listPresences = (member) => {
     const events = getEvents();
     var msg = "*LISTA DE PRESENÇA*\n";
