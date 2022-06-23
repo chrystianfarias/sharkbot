@@ -3,22 +3,10 @@ const EventsController = require('../controllers/EventsController');
 const MemberController = require('../controllers/membersController');
 
 const maintenance = false;
-const testers = [];//["554884891617@c.us", "554896380303@c.us"]
+const testers = ["554884891617@c.us", "554896380303@c.us"]
 
 const proccessMessage = async (msg, chat) => {
     const member = await MemberController.get(msg.from);
-    if (msg.body.includes("!sticker"))
-    {
-        if(msg.hasMedia) {
-            const media = await msg.downloadMedia();
-            chat.sendMessage(media, {sendMediaAsSticker: true });
-        }
-        else
-        {
-            msg.reply("Manda a foto, arrombado.");
-        }
-        return 0;
-    }
     if (chat.isGroup) {
         const mentions = await msg.getMentions();
         if (mentions.length == 1)
@@ -37,32 +25,20 @@ const proccessMessage = async (msg, chat) => {
                     {
                         msg.reply("Evento não localizado");
                     }
+                    return 0;
                 }
+                if(msg.hasMedia) {
+                    const media = await msg.downloadMedia();
+                    chat.sendMessage(media, {sendMediaAsSticker: true });
+                }
+                else
+                {
+                    msg.reply("Não localizei a imagem/vídeo. Me marque na lagenda da mídia!");
+                }
+                return 0;
             }
         }
         
-        if(msg.body === '!todos') {
-            const senderContact = await msg.getContact();
-            const member = getMember(senderContact.number.split("@")[0]);
-            let text = "";
-            let mentions = [];
-            if (member.role == "admin")
-            {
-    
-                for(let participant of chat.participants) {
-                    const contact = await client.getContactById(participant.id._serialized);
-                    
-                    mentions.push(contact);
-                    text += `@${participant.id.user} `;
-                }
-        
-                await chat.sendMessage(text, { mentions });
-            }
-            else
-            {
-                msg.reply("Você não é ADM");
-            }
-        }
         const quote = await msg.getQuotedMessage();
         if (quote)
         {
@@ -94,7 +70,16 @@ const proccessMessage = async (msg, chat) => {
             }
         }
         if (currentChat[msg.from] == undefined && msg.type != "list_response")
+        {
+            if (lastMsg[msg.from])
+            {
+                const spam = Date.now() - lastMsg[msg.from];
+                if (spam < 10000)
+                    return 0;
+            }
             mainMenu(msg, member);
+            lastMsg[msg.from] = Date.now();
+        }
         return 0;
 }
     return 1;

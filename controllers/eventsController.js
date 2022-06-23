@@ -31,10 +31,11 @@ class EventsController
             if (member.role == "guest")
                 return;
             let status = await MembersController.getStatus(member.number, event);
-            if (status == "pending")
+            if (status.confirmed == undefined)
             {
                 var _phoneId = await client.getNumberId(member.number)
                 var _isValid = await client.isRegisteredUser(_phoneId._serialized)
+                console.log(member.number);
                 if(_isValid) {
                     client.sendMessage(_phoneId._serialized, new List(`*${event.name}*\n\n📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}`, "Ações", [
                        {
@@ -98,6 +99,12 @@ class EventsController
     static async createEvent(event, msg) {
         return await api.post("/events", event).catch(err => {console.error(err); msg.reply(`⚠️ *${err.data}*`);});
     }
+    static async updateEvent(event, msg) {
+        return await api.put("/events/" + event.id, event).catch(err => {console.error(err); msg.reply(`⚠️ *${err.data}*`);});
+    }
+    static async deleteEvent(event, msg) {
+        return await api.delete("/events/" + event.id).catch(err => {console.error(err); msg.reply(`⚠️ *${err.data}*`);});
+    }
     static async searchEvent(search) {
         const res = await api.get("/search/events?search=" + search);
         var event = res.data;
@@ -152,23 +159,22 @@ class EventsController
                         const friend = await MembersController.getById(part.Member.friend_id);
                         friendStr = ` (Convidado de ${friend.name}) `
                     }
-                    var confirmedStr = "";
-                    switch(part.status)
+                    var confirmedStr = friendStr;
+                    if (part.confirmed == false)
                     {
-                        case "confirmed":
-                          confirmedStr = friendStr + "✅Confirmou a presença";
-                          break;
-                        case "recused":
-                          confirmedStr = friendStr + "🚫Recusou a presença";
-                          break;
-                        case "checkin":
-                          confirmedStr = friendStr + "✅Check-in foi feito";
-                          break;
-                        default:
-                          confirmedStr = friendStr + "❔Ainda não confirmou a presença";
-                          break;
+                        confirmedStr += "🚫Recusou a presença ";
                     }
+                    if (part.checkin)
+                    {
+                        confirmedStr += "✅Check-in foi feito ";
+                    }
+                    if (part.paid)
+                    {
+                        confirmedStr += "💲Pagamento realizado ";
+                    }
+                    
                     return {
+                        id: "member_itm",
                         title: `${index + 1} - ${part.Member.name}`,
                         description: confirmedStr
                     }

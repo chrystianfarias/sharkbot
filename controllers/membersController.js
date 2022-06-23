@@ -60,7 +60,7 @@ class MembersController
         return await new Promise((res, rej) => {
             api.get("/members/" + member.id + "/status/" + event.id)
                 .then(re => res(re.data))
-                .catch(err => rej(err));
+                .catch(err => res({}));
         })
     }
     static async checkin(msg, member, event) {

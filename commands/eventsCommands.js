@@ -52,6 +52,11 @@ const MemberController = require('../controllers/membersController');
              {
                  title: 'Comandos de Administrador',
                  rows:[
+                     {
+                        id: "notify_event_" + event.id,
+                        title: "⚠️ Notificar evento",
+                        description: "para todos os membros não confirmados"
+                     },
                      event.canceled ? {
                          id: "event_uncancel_" + event.id,
                          title: "❇️ Descancelar evento"
@@ -62,37 +67,46 @@ const MemberController = require('../controllers/membersController');
                      {
                          id: "event_edit_" + event.id,
                          title: "✏️ Editar evento"
-                     },
-                     {
-                         id: "remove_event_" + event.id,
-                         title: "🗑️ Deletar evento"
                      }
                  ]
              }
          ] : [];
          var status = await MemberController.getStatus(msg.from, event);
-         var confirmedStr = "";
-         switch(status)
+         var confirmed = false;
+         var confirmedStr = "❔Você ainda não confirmou a presença";
+         if (status)
          {
-            case "pending":
-               confirmedStr = "❔Você ainda não confirmou a presença";
-               break;
-            case "confirmed":
+            if (status.confirmed == true)
+            {
                confirmedStr = "✅Você confirmou a presença";
-               break;
-            case "recused":
+               confirmed = true;
+            }
+            if (status.confirmed == false)
+            {
                confirmedStr = "🚫Você recusou a presença";
-               break;
-            case "checkin":
-               confirmedStr = "✅Seu check-in foi feito";
-               break;
+            }
+         }
+         if (status.checkin)
+         {
+            confirmedStr = "✅Seu check-in foi feito";
+         }
+         if (status.paid)
+         {
+            confirmedStr += "\n✅Seu pagamento foi recebido";
+         }
+         else
+         {
+            if (event.payable && confirmed)
+            {
+               confirmedStr += "\n❗Seu pagamento ainda não foi recebido";
+            }
          }
          
          client.sendMessage(msg.from, new List(`📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}\n\n${confirmedStr}`, "Ações", [
             {
                title: "Ações",
                rows: [
-                  status == "pending" || status == "recused" ? {
+                  confirmed == false ? {
                      id: "confirm_event_" + event.id,
                      title: "✅ Confirmar presença"
                   }:{
@@ -155,10 +169,19 @@ const MemberController = require('../controllers/membersController');
          const location = new Location(event.Local.latitude, event.Local.longitude, event.Local.name);
          client.sendMessage(msg.from, location);
       }
+      if (msg.selectedRowId.includes("notify_event_"))
+      {
+         const id = parseInt(msg.selectedRowId.replace("notify_event_", ""));
+         await EventsController.notificateAllMembers(id);
+         client.sendMessage(msg.from, "Membros notificados.");
+         return 0;
+      }
       if (msg.selectedRowId.includes("event_edit_"))
       {
-         //const id = parseInt(msg.selectedRowId.replace("event_edit_", ""));
-         //const event = await EventsController.getEvent(id);
+         const id = parseInt(msg.selectedRowId.replace("event_edit_", ""));
+         const event = await EventsController.getEvent(id);
+         currentChat[msg.from].event = event;
+
          client.sendMessage(msg.from, "Função em construção.");
          return 0;
       }
@@ -350,22 +373,27 @@ const MemberController = require('../controllers/membersController');
    {
       var { event } = currentChat[msg.from];
       event.date = new Date(parseInt(event.date[2]), parseInt(event.date[1]), parseInt(event.date[0]), parseInt(event.hour[0]), parseInt(event.hour[1])).toUTCString();
-      const res = await EventsController.createEvent(event, msg);
-      console.log(res);
-      const newEvent = res.data;
-      console.log(newEvent);
-      client.sendMessage(msg.from, "*Evento criado!*");
-      currentChat[msg.from] = undefined;
-
-      if (msg.type == "list_response")
+      if (event.id)
       {
-         if (msg.selectedRowId == "add_event_notify")
-         {
-            EventsController.notificateAllMembers(newEvent.id);
-         }
-         msg.react("✅");
-         return 0;
+         const res = await EventsController.updateEvent(event, msg);
+         client.sendMessage(msg.from, "*Evento atualizado!*");
       }
+      else
+      {
+         const res = await EventsController.createEvent(event, msg);
+         const newEvent = res.data;
+         client.sendMessage(msg.from, "*Evento criado!*");
+         if (msg.type == "list_response")
+         {
+            if (msg.selectedRowId == "add_event_notify")
+            {
+               EventsController.notificateAllMembers(newEvent.id);
+            }
+            msg.react("✅");
+            return 0;
+         }
+      }
+      currentChat[msg.from] = undefined;
    }
    return 1;
  };

@@ -19,6 +19,7 @@ client.on('ready', async () => {
 
 global.currentChat = {}
 global.replyMsg = {}
+global.lastMsg = {}
 
 const proccessMessage = async msg => {
     let chat = await msg.getChat();

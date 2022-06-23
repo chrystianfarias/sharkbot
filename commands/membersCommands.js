@@ -30,6 +30,10 @@ const proccessMessage = async (msg, chat) => {
          client.sendMessage(msg.from, "Por favor, envie o contato do membro que deseja adicionar");
          return 0;
       }
+      if (msg.selectedRowId == "member_itm")
+      {
+         msg.reply("Sem interações");
+      }
    }
    if (msg.type === "vcard")
    {
