@@ -2,19 +2,20 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const EventsCommands = require('./commands/eventsCommands');
 const MembersCommands = require('./commands/membersCommands');
 const MainCommands = require('./commands/mainCommands');
+const qrcode = require('qrcode-terminal');
 
 global.client = new Client({
     ffmpegPath: "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
     authStrategy: new LocalAuth({
       clientId: "client-one"
-    }),
-    puppeteer: {
-      headless: false,
-    }
+    })
   });
 
 client.on('ready', async () => {
     console.log('Client is ready!');
+});
+client.on('qr', qr => {
+  qrcode.generate(qr, {small: true});
 });
 
 global.currentChat = {}

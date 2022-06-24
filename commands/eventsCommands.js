@@ -7,47 +7,7 @@ const MemberController = require('../controllers/membersController');
    {
       if (msg.selectedRowId == "events_itm")
       {
-         const member = await MemberController.get(msg.from);
-         const events = await EventsController.getEvents();
-         const admCommands = member.role == "admin" ? [
-             {
-                 title: 'Comandos de Administrador',
-                 rows:[
-                     {
-                         id: "add_event_itm",
-                         title: "➕ Criar evento",
-                         description: "Criar um novo evento"
-                     }
-                 ]
-             }
-         ] : [];
-
-         const eventList = events.length > 0 ?[{
-            rows: events.map(event => {
-               if (member.role == "guest" && event.member_only)
-               {
-                  return {
-                     id: "event_select_member",
-                     title: event.name,
-                     description: "🚫Evento apenas para membros"
-                  }
-               }
-               return {
-                  id: "event_select_" + event.id,
-                  title: event.name,
-                  description: event.canceled == true ? `🚫Evento cancelado` : `📆 ${event.date}`
-               }
-            })
-         }] : [{
-            rows: [{
-               title: "Sem eventos"
-            }]
-         }];
-      
-         client.sendMessage(msg.from, new List("Aqui está a lista de eventos", "Selecione um", [
-            ...eventList,
-            ...admCommands
-         ], "Eventos 📆"))
+         await EventsController.showEvents(msg, chat);
          return 0;
       }
       if (msg.selectedRowId == "event_select_member")
@@ -57,86 +17,8 @@ const MemberController = require('../controllers/membersController');
       }
       if (msg.selectedRowId.includes("event_select_"))
       {
-         const member = await MemberController.get(msg.from);
          const id = parseInt(msg.selectedRowId.replace("event_select_", ""));
-         const event = await EventsController.getEvent(id);
-         const admCommands = member.role == "admin" ? [
-             {
-                 title: 'Comandos de Administrador',
-                 rows:[
-                     {
-                        id: "notify_event_" + event.id,
-                        title: "⚠️ Notificar evento",
-                        description: "para todos os membros não confirmados"
-                     },
-                     event.canceled ? {
-                         id: "event_uncancel_" + event.id,
-                         title: "❇️ Descancelar evento"
-                     } : {
-                        id: "event_cancel_" + event.id,
-                        title: "🚫 Cancelar evento"
-                     },
-                     {
-                         id: "event_edit_" + event.id,
-                         title: "✏️ Editar evento"
-                     }
-                 ]
-             }
-         ] : [];
-         var status = await MemberController.getStatus(msg.from, event);
-         var confirmed = false;
-         var confirmedStr = "❔Você ainda não confirmou a presença";
-         if (status)
-         {
-            if (status.confirmed == true)
-            {
-               confirmedStr = "✅Você confirmou a presença";
-               confirmed = true;
-            }
-            if (status.confirmed == false)
-            {
-               confirmedStr = "🚫Você recusou a presença";
-            }
-         }
-         if (status.checkin)
-         {
-            confirmedStr = "✅Seu check-in foi feito";
-         }
-         if (status.paid)
-         {
-            confirmedStr += "\n✅Seu pagamento foi recebido";
-         }
-         else
-         {
-            if (event.payable && confirmed)
-            {
-               confirmedStr += "\n❗Seu pagamento ainda não foi recebido";
-            }
-         }
-         
-         client.sendMessage(msg.from, new List(`📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}\n\n${confirmedStr}`, "Ações", [
-            {
-               title: "Ações",
-               rows: [
-                  confirmed == false ? {
-                     id: "confirm_event_" + event.id,
-                     title: "✅ Confirmar presença"
-                  }:{
-                     id: "recuse_event_" + event.id,
-                     title: "🚫 Cancelar presença"
-                  },
-                  {
-                     id: "locate_event_" + event.id,
-                     title: "📌 Onde fica?"
-                  },
-                  {
-                      id: "event_participants_" + event.id,
-                      title: "👥 Ver participantes"
-                  }
-               ]
-            },
-            ...admCommands
-         ], event.name, "Clique no botão abaixo para ver algumas ações"));
+         await EventsController.showEvent(id, msg, chat);
          return 0;
       }
       if (msg.selectedRowId.includes("event_cancel_"))
@@ -145,6 +27,7 @@ const MemberController = require('../controllers/membersController');
          const event = await EventsController.getEvent(id);
          await EventsController.cancelEvent(event);
          client.sendMessage(msg.from, "*Evento cancelado!*");
+         return 0;
       }
       if (msg.selectedRowId.includes("event_uncancel_"))
       {
@@ -152,6 +35,7 @@ const MemberController = require('../controllers/membersController');
          const event = await EventsController.getEvent(id);
          await EventsController.uncancelEvent(event);
          client.sendMessage(msg.from, "*Evento descancelado!*");
+         return 0;
       }
       if (msg.selectedRowId.includes("confirm_event_"))
       {
@@ -160,6 +44,7 @@ const MemberController = require('../controllers/membersController');
          const member = await MemberController.get(msg.from);
          await MemberController.confirmPresence(msg, member, event);
          client.sendMessage(msg.from, "✅Presença confirmada!");
+         return 0;
       }
       if (msg.selectedRowId.includes("recuse_event_"))
       {
@@ -168,18 +53,19 @@ const MemberController = require('../controllers/membersController');
          const member = await MemberController.get(msg.from);
          await MemberController.cancelPresence(msg, member, event);
          client.sendMessage(msg.from, "🚫Presença cancelada!");
+         return 0;
       }
       if (msg.selectedRowId.includes("event_participants_"))
       {
          const id = parseInt(msg.selectedRowId.replace("event_participants_", ""));
          await EventsController.showPresenceList(msg, id);
+         return 0;
       }
       if (msg.selectedRowId.includes("locate_event_"))
       {
          const id = parseInt(msg.selectedRowId.replace("locate_event_", ""));
-         const event = await EventsController.getEvent(id);
-         const location = new Location(event.Local.latitude, event.Local.longitude, event.Local.name);
-         client.sendMessage(msg.from, location);
+         await EventsController.showLocation(id, msg, chat);
+         return 0;
       }
       if (msg.selectedRowId.includes("notify_event_"))
       {
@@ -409,6 +295,7 @@ const MemberController = require('../controllers/membersController');
    }
    return 1;
  };
+ 
  const memberQuestion = (msg) => {
    currentChat[msg.from].page = "add_event_member_question";
    client.sendMessage(msg.from, new List("Evento apenas para membros?", "Escolha", [

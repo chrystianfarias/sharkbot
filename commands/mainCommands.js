@@ -27,14 +27,45 @@ const proccessMessage = async (msg, chat) => {
                     }
                     return 0;
                 }
+                if (msg.body.includes("localização "))
+                {
+                    const search = msg.body.split("localização ")[1];
+                    const event = await EventsController.searchEvent(search);
+                    if (event)
+                    {
+                        await EventsController.showLocation(event.id, msg, chat);
+                    }
+                    else
+                    {
+                        msg.reply("Evento não localizado");
+                    }
+                    return 0;
+                }
+                if (msg.body.includes("evento "))
+                {
+                    const search = msg.body.split("evento ")[1];
+                    const event = await EventsController.searchEvent(search);
+                    if (event)
+                    {
+                        await EventsController.showEvent(event.id, msg, chat);
+                    }
+                    else
+                    {
+                        msg.reply("Evento não localizado");
+                    }
+                    return 0;
+                }
+                if (msg.body.includes("eventos"))
+                {
+                    await EventsController.showEvents(msg, chat);
+                    return 0;
+                }
                 if(msg.hasMedia) {
                     const media = await msg.downloadMedia();
                     chat.sendMessage(media, {sendMediaAsSticker: true });
+                    return 0;
                 }
-                else
-                {
-                    msg.reply("Não localizei a imagem/vídeo. Me marque na lagenda da mídia!");
-                }
+                msg.reply("Cara, não entendi o que tu quer");
                 return 0;
             }
         }

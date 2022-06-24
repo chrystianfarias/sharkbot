@@ -106,7 +106,7 @@ class EventsController
         return await api.delete("/events/" + event.id).catch(err => {console.error(err); msg.reply(`⚠️ *${err.data}*`);});
     }
     static async searchEvent(search) {
-        const res = await api.get("/search/events?search=" + search);
+        const res = await api.get("/search/events", {params: {search: search}});
         var event = res.data;
         if (event == null)
             return event;
@@ -141,6 +141,14 @@ class EventsController
         };
     }
     static async showPresenceList(msg, id, complete=false) {
+        
+        let chat = await msg.getChat();
+        let member = await MembersController.get(msg.from);
+        if (chat.isGroup) {
+            const senderContact = await msg.getContact();
+            member = await MembersController.get(senderContact.number);
+        }
+
       const event = await EventsController.getEvent(id);
       const participants = await EventsController.getEventParticipants(event);
       if (participants.length == 0)
@@ -149,7 +157,8 @@ class EventsController
       }
       else
       {
-        const newMsg = await client.sendMessage(msg.from, new List(complete ? `📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}\n\nResponda *Quero ir* para confirmar sua presença, ou chame no privado.`:`Lista de presença`, "👥 Ver participantes", [
+        const newMsg = await client.sendMessage((chat.isGroup && member.role == "admin") || chat.isGroup == false ? msg.from : member.number + "@c.us",
+        new List(complete ? `📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}\n\nResponda *Quero ir* para confirmar sua presença, ou chame no privado.`:`Lista de presença`, "👥 Ver participantes", [
             {
               title: "Participantes",
               rows: await Promise.all(participants.map(async (part, index) => {
@@ -183,6 +192,167 @@ class EventsController
         ], event.name, "Clique no botão abaixo para ver os participantes"));
         replyMsg[newMsg.id] = event.id;
       }
+      if (chat.isGroup && member.role != "admin")
+      {
+         msg.reply("Respondido no privado.");
+      }
     } 
+    static async showEvents(msg, chat) {
+        let member = await MembersController.get(msg.from);
+        if (chat.isGroup) {
+            const senderContact = await msg.getContact();
+            member = await MembersController.get(senderContact.number);
+        }
+        const events = await EventsController.getEvents();
+        const admCommands = member.role == "admin" && chat.isGroup == false? [
+              {
+                 title: 'Comandos de Administrador',
+                 rows:[
+                    {
+                          id: "add_event_itm",
+                          title: "➕ Criar evento",
+                          description: "Criar um novo evento"
+                    }
+                 ]
+              }
+        ] : [];
+     
+        const eventList = events.length > 0 ?[{
+           rows: events.map(event => {
+              if (member.role == "guest" && event.member_only)
+              {
+                 return {
+                    id: "event_select_member",
+                    title: event.name,
+                    description: "🚫Evento apenas para membros"
+                 }
+              }
+              return {
+                 id: "event_select_" + event.id,
+                 title: event.name,
+                 description: event.canceled == true ? `🚫Evento cancelado` : `📆 ${event.date}`
+              }
+           })
+        }] : [{
+           rows: [{
+              title: "Sem eventos"
+           }]
+        }];
+     
+        client.sendMessage((chat.isGroup && member.role == "admin") || chat.isGroup == false ? msg.from : member.number + "@c.us", new List("Aqui está a lista de eventos", "Selecione um", [
+           ...eventList,
+           ...admCommands
+        ], "Eventos 📆"))
+        if (chat.isGroup && member.role != "admin")
+        {
+           msg.reply("Respondido no privado.");
+        }
+      }
+    static async showLocation(id, msg, chat) {
+        let member = await MemberController.get(msg.from);
+        if (chat.isGroup) {
+            const senderContact = await msg.getContact();
+            member = await MemberController.get(senderContact.number);
+        }
+        const event = await EventsController.getEvent(id);
+        const location = new Location(event.Local.latitude, event.Local.longitude, event.Local.name);
+        client.sendMessage((chat.isGroup && member.role == "admin") || chat.isGroup == false ? msg.from : member.number + "@c.us", location);
+        if (chat.isGroup && member.role != "admin")
+        {
+        msg.reply("Respondido no privado.");
+        }
+    }
+    static async showEvent(id, msg, chat) {
+        let member = await MemberController.get(msg.from);
+         if (chat.isGroup) {
+            const senderContact = await msg.getContact();
+            member = await MemberController.get(senderContact.number);
+         }
+         const event = await EventsController.getEvent(id);
+         const admCommands = member.role == "admin" && chat.isGroup == false? [
+             {
+                 title: 'Comandos de Administrador',
+                 rows:[
+                     {
+                        id: "notify_event_" + event.id,
+                        title: "⚠️ Notificar evento",
+                        description: "para todos os membros não confirmados"
+                     },
+                     event.canceled ? {
+                         id: "event_uncancel_" + event.id,
+                         title: "❇️ Descancelar evento"
+                     } : {
+                        id: "event_cancel_" + event.id,
+                        title: "🚫 Cancelar evento"
+                     },
+                     {
+                         id: "event_edit_" + event.id,
+                         title: "✏️ Editar evento"
+                     }
+                 ]
+             }
+         ] : [];
+         var status = await MemberController.getStatus(msg.from, event);
+         var confirmed = false;
+         var confirmedStr = "❔Você ainda não confirmou a presença";
+         if (status)
+         {
+            if (status.confirmed == true)
+            {
+               confirmedStr = "✅Você confirmou a presença";
+               confirmed = true;
+            }
+            if (status.confirmed == false)
+            {
+               confirmedStr = "🚫Você recusou a presença";
+            }
+         }
+         if (status.checkin)
+         {
+            confirmedStr = "✅Seu check-in foi feito";
+         }
+         if (status.paid)
+         {
+            confirmedStr += "\n✅Seu pagamento foi recebido";
+         }
+         else
+         {
+            if (event.payable && confirmed)
+            {
+               confirmedStr += "\n❗Seu pagamento ainda não foi recebido";
+            }
+         }
+         var confirmedItems = chat.isGroup ? [] : [
+            confirmed == false ? {
+               id: "confirm_event_" + event.id,
+               title: "✅ Confirmar presença"
+            }:{
+               id: "recuse_event_" + event.id,
+               title: "🚫 Cancelar presença"
+            }
+         ]
+         client.sendMessage((chat.isGroup && member.role == "admin") || chat.isGroup == false ? msg.from : member.number + "@c.us", 
+         new List(`📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}` + (chat.isGroup == false ? `\n\n${confirmedStr}` : ''), "Ações", [
+            {
+               title: "Ações",
+               rows: [
+                  ...confirmedItems,
+                  {
+                     id: "locate_event_" + event.id,
+                     title: "📌 Onde fica?"
+                  },
+                  {
+                      id: "event_participants_" + event.id,
+                      title: "👥 Ver participantes"
+                  }
+               ]
+            },
+            ...admCommands
+         ], event.name, "Clique no botão abaixo para ver algumas ações"));
+         if (chat.isGroup && member.role != "admin")
+         {
+            msg.reply("Respondido no privado.");
+         }
+    }
 }
 module.exports = EventsController;
