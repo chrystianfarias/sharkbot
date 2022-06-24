@@ -5,10 +5,15 @@ const MainCommands = require('./commands/mainCommands');
 const qrcode = require('qrcode-terminal');
 
 global.client = new Client({
-    ffmpegPath: "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
     authStrategy: new LocalAuth({
       clientId: "client-one"
-    })
+    }),
+    puppeteer: {
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox'
+      ]
+    }
   });
 
 client.on('ready', async () => {
