@@ -27,8 +27,9 @@ const MemberController = require('../controllers/membersController');
                if (member.role == "guest" && event.member_only)
                {
                   return {
-                     title: `~${event.name}~`,
-                     description: "Evento para membros"
+                     id: "event_select_member",
+                     title: event.name,
+                     description: "🚫Evento apenas para membros"
                   }
                }
                return {
@@ -49,7 +50,11 @@ const MemberController = require('../controllers/membersController');
          ], "Eventos 📆"))
          return 0;
       }
-
+      if (msg.selectedRowId == "event_select_member")
+      {
+         msg.reply("Só é permitido membros visualizar esse evento.");
+         return 0;
+      }
       if (msg.selectedRowId.includes("event_select_"))
       {
          const member = await MemberController.get(msg.from);
