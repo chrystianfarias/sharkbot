@@ -20,7 +20,7 @@
     "vcf": "^2.1.1",
     "whatsapp-web.js": "1.17.0"
   },
-  "engine": {
+  "engines": {
     "node": "16.x"
   }
 }

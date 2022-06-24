@@ -249,10 +249,10 @@ class EventsController
         }
       }
     static async showLocation(id, msg, chat) {
-        let member = await MemberController.get(msg.from);
+        let member = await MembersController.get(msg.from);
         if (chat.isGroup) {
             const senderContact = await msg.getContact();
-            member = await MemberController.get(senderContact.number);
+            member = await MembersController.get(senderContact.number);
         }
         const event = await EventsController.getEvent(id);
         const location = new Location(event.Local.latitude, event.Local.longitude, event.Local.name);
@@ -263,10 +263,10 @@ class EventsController
         }
     }
     static async showEvent(id, msg, chat) {
-        let member = await MemberController.get(msg.from);
+        let member = await MembersController.get(msg.from);
          if (chat.isGroup) {
             const senderContact = await msg.getContact();
-            member = await MemberController.get(senderContact.number);
+            member = await MembersController.get(senderContact.number);
          }
          const event = await EventsController.getEvent(id);
          const admCommands = member.role == "admin" && chat.isGroup == false? [
