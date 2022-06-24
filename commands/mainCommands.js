@@ -86,6 +86,11 @@ const proccessMessage = async (msg, chat) => {
 };
 
 const mainMenu = (msg, member) => {
+    if (member.role == "unk")
+    {
+        client.sendMessage(msg.from, "Olá, você não está cadastrado como membro ou convidado do *SharkRunners*, por favor, entre em contato com um administrador.");
+        return 1;
+    }
     const admCommands = member.role == "admin" ? [
         {
             title: 'Comandos de Administrador',

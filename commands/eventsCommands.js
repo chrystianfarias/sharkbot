@@ -24,6 +24,13 @@ const MemberController = require('../controllers/membersController');
 
          const eventList = events.length > 0 ?[{
             rows: events.map(event => {
+               if (member.role == "guest" && event.member_only)
+               {
+                  return {
+                     title: `~${event.name}~`,
+                     description: "Evento para membros"
+                  }
+               }
                return {
                   id: "event_select_" + event.id,
                   title: event.name,
