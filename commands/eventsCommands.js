@@ -1,4 +1,4 @@
-const { List, Location } = require('whatsapp-web.js');
+const { List } = require('whatsapp-web.js');
 const EventsController = require('../controllers/eventsController.js');
 const MemberController = require('../controllers/membersController.js');
 
