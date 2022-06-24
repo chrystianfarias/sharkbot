@@ -1,6 +1,6 @@
 const api = require('../services/api');
 const { List } = require('whatsapp-web.js');
-const MembersController = require('./membersController');
+const MembersController = require('./membersController.js');
 const dateFormat = require('dateformat');
 
 class EventsController 

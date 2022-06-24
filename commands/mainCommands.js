@@ -1,6 +1,6 @@
 const { List } = require('whatsapp-web.js');
-const EventsController = require('../controllers/EventsController');
-const MemberController = require('../controllers/membersController');
+const EventsController = require('../controllers/eventsController.js');
+const MemberController = require('../controllers/membersController.js');
 
 const maintenance = false;
 const testers = ["554884891617@c.us", "554896380303@c.us"]

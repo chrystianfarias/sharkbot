@@ -1,6 +1,6 @@
 const { List, Location } = require('whatsapp-web.js');
-const EventsController = require('../controllers/EventsController');
-const MemberController = require('../controllers/membersController');
+const EventsController = require('../controllers/eventsController.js');
+const MemberController = require('../controllers/membersController.js');
 
  const proccessMessage = async(msg, chat) => {
    if (msg.type == "list_response")
