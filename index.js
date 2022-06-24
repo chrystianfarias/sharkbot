@@ -2,12 +2,8 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const EventsCommands = require('./commands/eventsCommands');
 const MembersCommands = require('./commands/membersCommands');
 const MainCommands = require('./commands/mainCommands');
-const qrcode = require('qrcode-terminal');
 
 global.client = new Client({
-    authStrategy: new LocalAuth({
-      clientId: "client-one"
-    }),
     puppeteer: {
       args: [
         '--no-sandbox',
@@ -17,10 +13,10 @@ global.client = new Client({
   });
 
 client.on('ready', async () => {
-    console.log('Client is ready!');
+  console.log('Client is ready!');
 });
 client.on('qr', qr => {
-  qrcode.generate(qr, {small: true});
+  console.log(qr);
 });
 
 global.currentChat = {}
@@ -40,3 +36,4 @@ const proccessMessage = async msg => {
 client.on('message', proccessMessage);
 
 client.initialize();
+console.log("initializing...");
