@@ -292,7 +292,7 @@ class EventsController
                  ]
              }
          ] : [];
-         var status = await MemberController.getStatus(msg.from, event);
+         var status = await MembersController.getStatus(msg.from, event);
          var confirmed = false;
          var confirmedStr = "❔Você ainda não confirmou a presença";
          if (status)
