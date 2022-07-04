@@ -95,6 +95,22 @@ class MembersController
             msg.reply(`⚠️ *Número inválido!*`)
         }
     }
+    static async getPayLink(msg, member, event) {
+        var _phoneId = await client.getNumberId(member.number)
+        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
+        if(_isValid) {
+            const res = await api.post(`https://sharkwpbotapi.herokuapp.com/pay/create`, {memberId: member.id, eventId: event.id})
+                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
+            msg.reply(`Clique no link abaixo para efetuar o pagamento`);
+            client.sendMessage(msg.from, res.data);
+            client.sendMessage(msg.from, "⚠️ Como é um recurso *BETA* pedimos para que você guarde o comprovante de pagamento.");
+            return;
+        }
+        else
+        {
+            msg.reply(`⚠️ *Número inválido!*`)
+        }
+    }
     static async checkout(msg, member, event) {
         var _phoneId = await client.getNumberId(member.number)
         var _isValid = await client.isRegisteredUser(_phoneId._serialized)

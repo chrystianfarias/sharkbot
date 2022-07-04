@@ -46,6 +46,14 @@ const MemberController = require('../controllers/membersController.js');
          client.sendMessage(msg.from, "✅Presença confirmada!");
          return 0;
       }
+      if (msg.selectedRowId.includes("pay_link_"))
+      {
+         const id = parseInt(msg.selectedRowId.replace("pay_link_", ""));
+         const event = await EventsController.getEvent(id);
+         const member = await MemberController.get(msg.from);
+         await MemberController.getPayLink(msg, member, event);
+         return 0;
+      }
       if (msg.selectedRowId.includes("recuse_event_"))
       {
          const id = parseInt(msg.selectedRowId.replace("recuse_event_", ""));

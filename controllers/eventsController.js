@@ -349,6 +349,13 @@ class EventsController
                title: "🚫 Cancelar presença"
             }
          ]
+         var payItems = event.payable && status.paid == false && chat.isGroup == false ? [
+            {
+               id: "pay_link_" + event.id,
+               title: "💲 Pagar com MercadoPago",
+               description: "Recurso BETA"
+            }
+         ] : [] 
          client.sendMessage((chat.isGroup && member.role == "admin") || chat.isGroup == false ? msg.from : member.number + "@c.us", 
          new List(`📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}` + (chat.isGroup == false ? `\n\n${confirmedStr}` : '') + priceStr, "Ações", [
             {
@@ -362,7 +369,8 @@ class EventsController
                   {
                       id: "event_participants_" + event.id,
                       title: "👥 Ver participantes"
-                  }
+                  },
+                  ...payItems
                ]
             },
             ...admCommands
