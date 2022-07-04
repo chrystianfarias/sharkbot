@@ -68,10 +68,26 @@ class MembersController
         var _isValid = await client.isRegisteredUser(_phoneId._serialized)
         if(_isValid) {
             const res = await api.post(`/events/${event.id}/checkin`, {memberId: member.id})
-                .catch(err =>msg.reply(`⚠️ *${err}*`))
+                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
                 
             msg.reply(`Check-in de ${member.name} feito`);
             client.sendMessage(_phoneId._serialized, `Olá ${member.name}, seu check-in no evento '${event.name}' foi feito ✅`);
+            return;
+        }
+        else
+        {
+            msg.reply(`⚠️ *Número inválido!*`)
+        }
+    }
+    static async pay(msg, member, event) {
+        var _phoneId = await client.getNumberId(member.number)
+        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
+        if(_isValid) {
+            const res = await api.post(`/events/${event.id}/pay`, {memberId: member.id})
+                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
+                
+            msg.reply(`Pagamento de ${member.name} confirmado`);
+            client.sendMessage(_phoneId._serialized, `Olá ${member.name}, seu pagamento para o evento *${event.name}* foi recebido, obrigado!`);
             return;
         }
         else
@@ -84,7 +100,7 @@ class MembersController
         var _isValid = await client.isRegisteredUser(_phoneId._serialized)
         if(_isValid) {
             const res = await api.post(`/events/${event.id}/checkout`, {memberId: member.id})
-                .catch(err =>msg.reply(`⚠️ *${err}*`))
+                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
 
             msg.reply(`Check-out de ${member.name} feito`);
             return;
@@ -99,7 +115,7 @@ class MembersController
         var _isValid = await client.isRegisteredUser(_phoneId._serialized)
         if(_isValid) {
             const res = await api.post(`/events/${event.id}/participants`, {memberId: member.id})
-                .catch(err => {msg.reply(`⚠️ *${err}*`)})
+                .catch(err => {msg.reply(`⚠️ *${err.response.data}*`)})
             return;
         }
         else
@@ -112,7 +128,7 @@ class MembersController
         var _isValid = await client.isRegisteredUser(_phoneId._serialized)
         if(_isValid) {
             const res = api.post(`/events/${event.id}/recuse`, {memberId: member.id})
-                .catch(err =>msg.reply(`⚠️ *${err}*`))
+                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
             return;
         }
         else

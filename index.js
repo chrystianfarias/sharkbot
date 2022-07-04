@@ -16,7 +16,7 @@ client.on('ready', async () => {
   console.log('Client is ready!');
 });
 client.on('qr', qr => {
-  console.log(qr);
+  console.log("https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(qr));
 });
 
 global.currentChat = {}

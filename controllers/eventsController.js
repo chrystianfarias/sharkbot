@@ -31,13 +31,22 @@ class EventsController
             if (member.role == "guest")
                 return;
             let status = await MembersController.getStatus(member.number, event);
-            if (status.confirmed == undefined)
+            if (status.confirmed == undefined || (event.pix && status.paid == false))
             {
                 var _phoneId = await client.getNumberId(member.number)
                 var _isValid = await client.isRegisteredUser(_phoneId._serialized)
-                console.log(member.number);
+                var msg = "";
+                if (event.pix && status.paid == false && status.confirmed)
+                {
+                    msg = "🚫 Você confirmou mas ainda não efetuou o pagamento";
+                    msg += "\n🪪 PIX: " + event.pix;
+                    msg += "\n💵 Valor: " + event.price.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    });;
+                }
                 if(_isValid) {
-                    client.sendMessage(_phoneId._serialized, new List(`*${event.name}*\n\n📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}`, "Ações", [
+                    client.sendMessage(_phoneId._serialized, new List(`*${event.name}*\n\n📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}\n${msg}`, "Ações", [
                        {
                           title: "Ações",
                           rows: [
@@ -59,7 +68,7 @@ class EventsController
                              }
                           ]
                        }
-                    ], `${member.name}, evento novo do SharkRunners`, "Clique no botão abaixo para ver algumas ações"));
+                    ], `${member.name}, evento do SharkRunners`, "Clique no botão abaixo para ver algumas ações"));
                 }
                 else
                 {
@@ -183,7 +192,7 @@ class EventsController
                     }
                     
                     return {
-                        id: "member_itm",
+                        id: `member_itm_${part.Member.id}_event_${id}`,
                         title: `${index + 1} - ${part.Member.name}`,
                         description: confirmedStr
                     }
@@ -295,6 +304,7 @@ class EventsController
          var status = await MembersController.getStatus(msg.from, event);
          var confirmed = false;
          var confirmedStr = "❔Você ainda não confirmou a presença";
+         var priceStr = "";
          if (status)
          {
             if (status.confirmed == true)
@@ -322,6 +332,14 @@ class EventsController
                confirmedStr += "\n❗Seu pagamento ainda não foi recebido";
             }
          }
+         if (event.pix)
+         {
+            priceStr += "\n🪪 PIX: " + event.pix;
+            priceStr += "\n💵 Valor: " + event.price.toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+            });;
+         }
          var confirmedItems = chat.isGroup ? [] : [
             confirmed == false ? {
                id: "confirm_event_" + event.id,
@@ -332,7 +350,7 @@ class EventsController
             }
          ]
          client.sendMessage((chat.isGroup && member.role == "admin") || chat.isGroup == false ? msg.from : member.number + "@c.us", 
-         new List(`📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}` + (chat.isGroup == false ? `\n\n${confirmedStr}` : ''), "Ações", [
+         new List(`📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}` + (chat.isGroup == false ? `\n\n${confirmedStr}` : '') + priceStr, "Ações", [
             {
                title: "Ações",
                rows: [
@@ -349,6 +367,13 @@ class EventsController
             },
             ...admCommands
          ], event.name, "Clique no botão abaixo para ver algumas ações"));
+         if (chat.isGroup == false)
+         {
+            if (event.pix && status.paid == false && event.payable)
+            {
+                client.sendMessage(msg.from, "Se você já pagou, aguarde até processarmos seu pagamento.")
+            }
+         }
          if (chat.isGroup && member.role != "admin")
          {
             msg.reply("Respondido no privado.");
