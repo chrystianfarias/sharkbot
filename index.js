@@ -61,3 +61,4 @@ app.post("/payReceive", async(req, res) => {
 server.listen(port, () =>
   console.log(`Server HTTP running on ${port}`),
 );
+module.exports = server;
