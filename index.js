@@ -1,7 +1,20 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client } = require('whatsapp-web.js');
 const EventsCommands = require('./commands/eventsCommands');
 const MembersCommands = require('./commands/membersCommands');
 const MainCommands = require('./commands/mainCommands');
+const MembersController = require('./controllers/membersController');
+const EventsController = require('./controllers/eventsController');
+
+//HTTP
+const express = require('express');
+const app = express();
+const cors = require('cors');
+const server = require('http').createServer(app);
+const bodyParser = require('body-parser');
+const port = process.env.PORT || 3001;
+
+app.use(cors());
+app.use(bodyParser.json());
 
 global.client = new Client({
     puppeteer: {
@@ -36,4 +49,15 @@ const proccessMessage = async msg => {
 client.on('message', proccessMessage);
 
 client.initialize();
-console.log("initializing...");
+app.post("/payReceive", async(req, res) => {
+  const {memberId, eventId} = req.body;
+  const member = await MembersController.getById(memberId);
+  const event = await EventsController.getEvent(eventId);
+  client.sendMessage(member.number + "@c.us", `Olá, ${member.name}! Seu pagamento para o evento ${event.name} foi *recebido*, obrigado!`);
+
+  return res.status(200).json({});
+});
+
+server.listen(port, () =>
+  console.log(`Server HTTP running on ${port}`),
+);
