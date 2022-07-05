@@ -336,17 +336,17 @@ class EventsController
                     title: "💲 Pagar com MercadoPago",
                     description: "Recurso BETA"
                 }];
+                if (event.pix)
+                {
+                   priceStr += "\n🪪 PIX: " + event.pix;
+                   payItems = [];
+                }
             }
          }
-         if (event.pix)
-         {
-            priceStr += "\n🪪 PIX: " + event.pix;
-            priceStr += "\n💵 Valor: " + event.price.toLocaleString('pt-BR', {
-              style: 'currency',
-              currency: 'BRL',
-            });
-            payItems = [];
-         }
+         priceStr += "\n💵 Valor: " + event.price.toLocaleString('pt-BR', {
+           style: 'currency',
+           currency: 'BRL',
+         });
          var confirmedItems = chat.isGroup ? [] : [
             confirmed == false ? {
                id: "confirm_event_" + event.id,

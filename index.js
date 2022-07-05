@@ -53,7 +53,7 @@ app.post("/payReceive", async(req, res) => {
   const {memberId, eventId} = req.body;
   const member = await MembersController.getById(memberId);
   const event = await EventsController.getEvent(eventId);
-  client.sendMessage(member.number + "@c.us", `Olá, ${member.name}! Seu pagamento para o evento ${event.name} foi *recebido*, obrigado!`);
+  client.sendMessage(member.number + "@c.us", `✅💲💲 ${member.name}, seu pagamento para o evento ${event.name} foi *recebido*, obrigado!`);
 
   return res.status(200).json({});
 });
