@@ -100,6 +100,13 @@ const proccessMessage = async (msg, chat) => {
                 return 0;
             }
         }
+        
+        if(msg.hasMedia) {
+            const media = await msg.downloadMedia();
+            chat.sendMessage(media, {sendMediaAsSticker: true });
+            return 0;
+        }
+        
         if (currentChat[msg.from] == undefined && msg.type != "list_response")
         {
             if (lastMsg[msg.from])
