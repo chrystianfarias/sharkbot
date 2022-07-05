@@ -48,10 +48,19 @@ const MemberController = require('../controllers/membersController.js');
       }
       if (msg.selectedRowId.includes("pay_link_"))
       {
+         console.log("1");
          const id = parseInt(msg.selectedRowId.replace("pay_link_", ""));
          const event = await EventsController.getEvent(id);
          const member = await MemberController.get(msg.from);
          await MemberController.getPayLink(msg, member, event);
+         return 0;
+      }
+      if (msg.selectedRowId.includes("pay_check_link_"))
+      {
+         const id = parseInt(msg.selectedRowId.replace("pay_check_link_", ""));
+         const event = await EventsController.getEvent(id);
+         const member = await MemberController.get(msg.from);
+         await MemberController.checkPayLink(msg, member, event);
          return 0;
       }
       if (msg.selectedRowId.includes("recuse_event_"))

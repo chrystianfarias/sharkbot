@@ -1,5 +1,6 @@
 const api = require('../services/api');
-
+const { List } = require('whatsapp-web.js');
+const { default: axios } = require('axios');
 class MembersController
 {
     static async add(msg, member) {
@@ -103,7 +104,38 @@ class MembersController
                 .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
             msg.reply(`Clique no link abaixo para efetuar o pagamento`);
             client.sendMessage(msg.from, res.data);
-            client.sendMessage(msg.from, "⚠️ Como é um recurso *BETA* pedimos para que você guarde o comprovante de pagamento.");
+            client.sendMessage(msg.from, new List("⚠️ Como é um recurso *BETA* pedimos para que você guarde o comprovante de pagamento.", "Ações", [
+                {
+                   title: "Ações",
+                   rows: [
+                      {
+                         id: "pay_check_link_" + event.id,
+                         title: "⏳ Verificar pagamento",
+                         description: "Aguarde alguns minutos após a efetuação do pagamento para verificar."
+                      }
+                   ]
+                }
+             ]));
+            return;
+        }
+        else
+        {
+            msg.reply(`⚠️ *Número inválido!*`)
+        }
+    }
+    static async checkPayLink(msg, member, event) {
+        console.log("2");
+        var _phoneId = await client.getNumberId(member.number)
+        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
+        if(_isValid) {
+            const res = await axios.get(`https://sharkwpbotapi.herokuapp.com/pay/check?memberId=${member.id}&eventId=${event.id}`)
+                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
+            if (res.data == true)
+            {
+                msg.reply(`✅ Seu pagamento para o evento *${event.name}* foi recebido, obrigado!`);
+                return;
+            }
+            msg.reply("🚫 *Ainda não recebemos seu pagamento*\nAguardo alguns minutos após o pagamento e tente novamente.");
             return;
         }
         else
