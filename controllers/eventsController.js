@@ -144,6 +144,15 @@ class EventsController
         }
 
       const event = await EventsController.getEvent(id);
+      var priceStr = "";
+      if (event.price)
+      {
+         priceStr += "\n💵 Valor: " + event.price.toLocaleString('pt-BR', {
+           style: 'currency',
+           currency: 'BRL',
+         });
+         priceStr += "\nPara pagar, *me chama no privado*!"
+      }
       const participants = await EventsController.getEventParticipants(event);
       if (participants.length == 0)
       {
