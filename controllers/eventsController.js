@@ -1,5 +1,5 @@
 const api = require('../services/api');
-const { List, Location } = require('whatsapp-web.js');
+const { List, Location, MessageMedia } = require('whatsapp-web.js');
 const MembersController = require('./membersController.js');
 const dateFormat = require('dateformat');
 
@@ -333,7 +333,7 @@ class EventsController
                confirmedStr += "\n❗Seu pagamento ainda não foi recebido";
                payItems = [{
                     id: "pay_link_" + event.id,
-                    title: "💲 Pagar com MercadoPago",
+                    title: "🤝 Pagar com MercadoPago",
                     description: "Recurso BETA"
                 }];
                 if (event.pix)
@@ -343,10 +343,13 @@ class EventsController
                 }
             }
          }
-         priceStr += "\n💵 Valor: " + event.price.toLocaleString('pt-BR', {
-           style: 'currency',
-           currency: 'BRL',
-         });
+         if (event.price)
+         {
+            priceStr += "\n💵 Valor: " + event.price.toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+            });
+         }
          var confirmedItems = chat.isGroup ? [] : [
             confirmed == false ? {
                id: "confirm_event_" + event.id,
@@ -356,6 +359,11 @@ class EventsController
                title: "🚫 Cancelar presença"
             }
          ]
+         if (event.media_url)
+         {
+            const media = await MessageMedia.fromUrl(event.media_url);
+            await client.sendMessage(msg.from, media);
+         }
          client.sendMessage((chat.isGroup && member.role == "admin") || chat.isGroup == false ? msg.from : member.number + "@c.us", 
          new List(`📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}` + (chat.isGroup == false ? `\n\n${confirmedStr}` : '') + priceStr, "Ações", [
             {
