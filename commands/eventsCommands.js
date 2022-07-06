@@ -44,6 +44,7 @@ const MemberController = require('../controllers/membersController.js');
          const member = await MemberController.get(msg.from);
          await MemberController.confirmPresence(msg, member, event);
          client.sendMessage(msg.from, "✅Presença confirmada!");
+         await EventsController.showEvent(id, msg, chat);
          return 0;
       }
       if (msg.selectedRowId.includes("pay_link_"))
