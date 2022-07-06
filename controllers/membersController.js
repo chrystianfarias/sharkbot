@@ -109,7 +109,6 @@ class MembersController
                 .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
             msg.reply(`*Clique no link* abaixo para efetuar o pagamento`);
             client.sendMessage(msg.from, res.data);
-            client.sendMessage(msg.from, "⚠️ Como é um recurso *BETA* pedimos para que você guarde o comprovante de pagamento ⚠️");
             return;
         }
         else
