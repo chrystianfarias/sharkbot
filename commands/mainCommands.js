@@ -16,10 +16,10 @@ const proccessMessage = async (msg, chat) => {
                 if (msg.body.includes("participantes "))
                 {
                     const search = msg.body.split("participantes ")[1];
-                    const event = await EventsController.searchEvent(search);
-                    if (event)
+                    const events = await EventsController.searchEvents(search);
+                    if (events.length > 0)
                     {
-                        await EventsController.showPresenceList(msg, event.id, true);
+                        await EventsController.showPresenceList(msg, events[0].id, true);
                     }
                     else
                     {
@@ -30,10 +30,10 @@ const proccessMessage = async (msg, chat) => {
                 if (msg.body.includes("localização "))
                 {
                     const search = msg.body.split("localização ")[1];
-                    const event = await EventsController.searchEvent(search);
-                    if (event)
+                    const events = await EventsController.searchEvents(search);
+                    if (events.length > 0)
                     {
-                        await EventsController.showLocation(event.id, msg, chat);
+                        await EventsController.showLocation(events[0].id, msg, chat);
                     }
                     else
                     {
@@ -44,10 +44,10 @@ const proccessMessage = async (msg, chat) => {
                 if (msg.body.includes("evento "))
                 {
                     const search = msg.body.split("evento ")[1];
-                    const event = await EventsController.searchEvent(search);
-                    if (event)
+                    const events = await EventsController.searchEvents(search);
+                    if (events.length > 0)
                     {
-                        await EventsController.showEvent(event.id, msg, chat);
+                        await EventsController.showEvent(events[0].id, msg, chat);
                     }
                     else
                     {

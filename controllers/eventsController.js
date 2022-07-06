@@ -114,24 +114,9 @@ class EventsController
     static async deleteEvent(event, msg) {
         return await api.delete("/events/" + event.id).catch(err => {console.error(err); msg.reply(`⚠️ *${err.data}*`);});
     }
-    static async searchEvent(search) {
-        const res = await api.get("/search/events", {params: {search: search}});
-        var event = res.data;
-        if (event == null)
-            return event;
-
-        if (event.date == null)
-            return {
-                ...event,
-                date: "Sem data confirmada",
-                hour: "Sem horário confirmado"
-            }
-        const date = new Date(event.date);
-        return {
-            ...event,
-            date: dateFormat(date, "dd/mm/yyyy"),
-            hour: dateFormat(date, "HH:MM")
-        };
+    static async searchEvents(search) {
+        const res = await api.get("/search/events/" + encodeURIComponent(search));
+        return res.data;
     }
     static async getEvent(id) {
         const res = await api.get("/events/" + id);
