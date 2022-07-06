@@ -96,16 +96,30 @@ class MembersController
             msg.reply(`⚠️ *Número inválido!*`)
         }
     }
+    static async addCpf(msg, member, cpf) {
+        const res = await api.put("/members/" + member.id, {cpf})
+            .catch(err =>msg.reply(`⚠️ *${err.response.data}*`));
+        return res.status == 200;
+    }
     static async getPayLink(msg, member, event) {
         var _phoneId = await client.getNumberId(member.number)
         var _isValid = await client.isRegisteredUser(_phoneId._serialized)
         if(_isValid) {
-            const res = await api.post(`https://sharkwpbotapi.herokuapp.com/pay/create`, {memberId: member.id, eventId: event.id})
-                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
-            msg.reply(`Clique no link abaixo para efetuar o pagamento`);
-            client.sendMessage(msg.from, res.data);
-            client.sendMessage(msg.from, "⚠️ Como é um recurso *BETA* pedimos para que você guarde o comprovante de pagamento.");
-            return;
+            try
+            {
+                const res = await api.post(`https://sharkwpbotapi.herokuapp.com/pay/create`, {memberId: member.id, eventId: event.id});
+                msg.reply(`*Clique no link* abaixo para efetuar o pagamento`);
+                client.sendMessage(msg.from, res.data);
+                client.sendMessage(msg.from, "⚠️ Como é um recurso *BETA* pedimos para que você guarde o comprovante de pagamento ⚠️");
+                return;
+            }
+            catch(err)
+            {
+                client.sendMessage(msg.from, "Para efetuar o pagamento, necessitamos que você cadastre o *seu CPF*, é só dessa vez!");
+                client.sendMessage(msg.from, "Por favor, digite o *CPF*:");
+                currentChat[msg.from] = {page: "add_cpf",attempt:0, event: event};
+                return;
+            }
         }
         else
         {

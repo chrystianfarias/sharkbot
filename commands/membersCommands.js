@@ -66,10 +66,12 @@ const proccessMessage = async (msg, chat) => {
                   ]
                }], memberSelected.name
             ));
+            return 0;
          }
          else
          {
             msg.reply("Sem interações");
+            return 0;
          }
       }
 
@@ -83,6 +85,7 @@ const proccessMessage = async (msg, chat) => {
          const eventSelected = await EventsController.getEvent(idEvent);
          
          await MembersController.checkin(msg, memberSelected, eventSelected);
+         return 0;
       }
       if (msg.selectedRowId.includes("checkout_member_"))
       {
@@ -94,6 +97,7 @@ const proccessMessage = async (msg, chat) => {
          const eventSelected = await EventsController.getEvent(idEvent);
          
          await MembersController.checkout(msg, memberSelected, eventSelected);
+         return 0;
       }
       if (msg.selectedRowId.includes("paid_member_"))
       {
@@ -105,6 +109,52 @@ const proccessMessage = async (msg, chat) => {
          const eventSelected = await EventsController.getEvent(idEvent);
          
          await MembersController.pay(msg, memberSelected, eventSelected);
+         return 0;
+      }
+   }
+   if (currentChat[msg.from])
+   {
+      if (currentChat[msg.from].page == "add_cpf")
+      {
+         var input = msg.body;
+         if (/^\d{3}.?\d{3}.?\d{3}-?\d{2}$/.test(input))
+         {
+            var matches = input.match(/(\d+)/);
+            console.log(matches[0].length);
+            if (matches[0].length == 11)
+            {
+               const member = await MembersController.get(msg.from);
+               const res = MembersController.addCpf(msg, member, matches[0]);
+               if (res == true)
+               {
+                  await MembersController.getPayLink(msg, member, currentChat[msg.from].event);
+                  currentChat[msg.from] = undefined;
+                  return;
+               }
+               else
+               {
+                  msg.reply("Falha ao cadastrar.")
+                  msg.react("🚫")
+               }
+            }
+            else
+            {
+               msg.reply("Quantidade de dívidos inválida.")
+               msg.react("🚫");
+            }
+         }
+         else
+         {
+            msg.reply("Isso é um CPF? (insira no padrão: 123.456.789-01)")
+            msg.react("🚫");
+         }
+         if (currentChat[msg.from].attempt == 3)
+         {
+            msg.reply("🚫 Falha ao adicionar o CPF, contate um administrador.")
+            currentChat[msg.from] = undefined;
+            return;
+         }
+         currentChat[msg.from].attempt += 1;
       }
    }
 
