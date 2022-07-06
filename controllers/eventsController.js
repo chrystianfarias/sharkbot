@@ -250,7 +250,7 @@ class EventsController
      
         client.sendMessage((chat.isGroup && member.role == "admin") || chat.isGroup == false ? msg.from : member.number + "@c.us", new List("Aqui está a lista de eventos", "Selecione um", [
            ...eventList,
-           ...admCommands
+           //...admCommands
         ], "Eventos 📆"))
         if (chat.isGroup && member.role != "admin")
         {
@@ -293,11 +293,11 @@ class EventsController
                      } : {
                         id: "event_cancel_" + event.id,
                         title: "🚫 Cancelar evento"
-                     },
+                     }/*,
                      {
                          id: "event_edit_" + event.id,
                          title: "✏️ Editar evento"
-                     }
+                     }*/
                  ]
              }
          ] : [];
