@@ -160,6 +160,12 @@ class EventsController
       }
       else
       {
+        if (event.media_url)
+        {
+           const media = await MessageMedia.fromUrl(event.media_url);
+           await client.sendMessage(msg.from, media);
+        }
+
         const newMsg = await client.sendMessage((chat.isGroup && member.role == "admin") || chat.isGroup == false ? msg.from : member.number + "@c.us",
         new List(complete ? `📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}\n\nResponda *Quero ir* para confirmar sua presença, ou chame no privado.`:`Lista de presença`, "👥 Ver participantes", [
             {
