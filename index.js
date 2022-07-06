@@ -1,4 +1,4 @@
-const { Client } = require('whatsapp-web.js');
+const { Client, MessageMedia } = require('whatsapp-web.js');
 const EventsCommands = require('./commands/eventsCommands');
 const MembersCommands = require('./commands/membersCommands');
 const MainCommands = require('./commands/mainCommands');
@@ -17,6 +17,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 global.client = new Client({
+    restartOnAuthFail: true,
     puppeteer: {
       args: [
         '--no-sandbox',
@@ -53,7 +54,11 @@ app.post("/payReceive", async(req, res) => {
   const {memberId, eventId} = req.body;
   const member = await MembersController.getById(memberId);
   const event = await EventsController.getEvent(eventId);
-  client.sendMessage(member.number + "@c.us", `✅💲💲 ${member.name}, seu pagamento para o evento ${event.name} foi *recebido*, obrigado!`);
+
+  client.sendMessage(member.number + "@c.us", `${member.name}, seu pagamento para o evento ${event.name} foi *recebido*, valeu! ✅`);
+
+  const webpImage = MessageMedia.fromFilePath('assets/stickers/hiago.webp');
+  client.sendMessage(member.number + "@c.us", webpImage, { sendMediaAsSticker: true });
 
   return res.status(200).json({});
 });
