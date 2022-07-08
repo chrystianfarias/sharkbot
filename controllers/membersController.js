@@ -4,30 +4,20 @@ const { default: axios } = require('axios');
 class MembersController
 {
     static async add(msg, member) {
-
-        var _phoneId = await client.getNumberId(member.number)
-        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
-        if (_isValid)
-        {
-            api.post("/members", member)
-            .then(res => {
-                var str = "membro";
-                if (member.role == "moderador")
-                    str = "moderador";
-                if (member.role == "admin")
-                    str = "ADM";
-                if (member.role == "guest")
-                    str = "convidado";
-                client.sendMessage(_phoneId._serialized, `Olá ${member.name}, seu número foi cadastrado no bot do *SharkRunners* como ` + str);
-            })
-            .catch(err => {
-                msg.reply(`⚠️ *${err.body}*`)
-            });
-        }
-        else
-        {
-            msg.reply(`⚠️ *Número inválido!*`)
-        }
+        api.post("/members", member)
+        .then(res => {
+            var str = "membro";
+            if (member.role == "moderador")
+                str = "moderador";
+            if (member.role == "admin")
+                str = "ADM";
+            if (member.role == "guest")
+                str = "convidado";
+            client.sendMessage(member.number + "@c.us", `Olá ${member.name}, seu número foi cadastrado no bot do *SharkRunners* como ` + str);
+        })
+        .catch(err => {
+            msg.reply(`⚠️ *${err.body}*`)
+        });
     }
     static ban (msg, number) {
         api.delete("/members/" + number)
@@ -65,36 +55,19 @@ class MembersController
         })
     }
     static async checkin(msg, member, event) {
-        var _phoneId = await client.getNumberId(member.number)
-        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
-        if(_isValid) {
-            const res = await api.post(`/events/${event.id}/checkin`, {memberId: member.id})
-                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
-                
-            msg.reply(`Check-in de ${member.name} feito`);
-            client.sendMessage(_phoneId._serialized, `Olá ${member.name}, seu check-in no evento '${event.name}' foi feito ✅`);
-            return;
-        }
-        else
-        {
-            msg.reply(`⚠️ *Número inválido!*`)
-        }
+        await api.post(`/events/${event.id}/checkin`, {memberId: member.id})
+            .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
+            
+        msg.reply(`Check-in de ${member.name} feito`);
+        client.sendMessage(member.number + "@c.us", `Olá ${member.name}, seu check-in no evento '${event.name}' foi feito ✅`);
     }
     static async pay(msg, member, event) {
-        var _phoneId = await client.getNumberId(member.number)
-        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
-        if(_isValid) {
-            const res = await api.post(`/events/${event.id}/pay`, {memberId: member.id})
-                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
-                
-            msg.reply(`Pagamento de ${member.name} confirmado`);
-            client.sendMessage(_phoneId._serialized, `Olá ${member.name}, seu pagamento para o evento *${event.name}* foi recebido, obrigado!`);
-            return;
-        }
-        else
-        {
-            msg.reply(`⚠️ *Número inválido!*`)
-        }
+        await api.post(`/events/${event.id}/pay`, {memberId: member.id})
+            .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
+            
+        msg.reply(`Pagamento de ${member.name} confirmado`);
+        client.sendMessage(member.number + "@c.us", `Olá ${member.name}, seu pagamento para o evento *${event.name}* foi recebido, obrigado!`);
+            
     }
     static async addCpf(msg, member, cpf) {
         const res = await api.put("/members/" + member.id, {cpf})
@@ -102,80 +75,35 @@ class MembersController
         return res.status == 200;
     }
     static async getPayLink(msg, member, event) {
-        var _phoneId = await client.getNumberId(member.number)
-        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
-        if(_isValid) {
-            const res = await api.post(`https://sharkwpbotapi.herokuapp.com/pay/create`, {memberId: member.id, eventId: event.id})
-                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
-            msg.reply(`*Clique no link* abaixo para efetuar o pagamento`);
-            client.sendMessage(msg.from, res.data);
-            return;
-        }
-        else
-        {
-            msg.reply(`⚠️ *Número inválido!*`)
-        }
+        await api.post(`https://sharkwpbotapi.herokuapp.com/pay/create`, {memberId: member.id, eventId: event.id})
+            .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
+        msg.reply(`*Clique no link* abaixo para efetuar o pagamento`);
+        client.sendMessage(msg.from, res.data);
     }
     static async checkPayLink(msg, member, event) {
-        console.log("2");
-        var _phoneId = await client.getNumberId(member.number)
-        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
-        if(_isValid) {
-            const res = await axios.get(`https://sharkwpbotapi.herokuapp.com/pay/check?memberId=${member.id}&eventId=${event.id}`)
-                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
-            if (res.data == true)
-            {
-                msg.reply(`✅ Seu pagamento para o evento *${event.name}* foi recebido, obrigado!`);
-                return;
-            }
-            msg.reply("🚫 *Ainda não recebemos seu pagamento*\nAguardo alguns minutos após o pagamento e tente novamente.");
+        const res = await axios.get(`https://sharkwpbotapi.herokuapp.com/pay/check?memberId=${member.id}&eventId=${event.id}`)
+            .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
+        if (res.data == true)
+        {
+            msg.reply(`✅ Seu pagamento para o evento *${event.name}* foi recebido, obrigado!`);
             return;
         }
-        else
-        {
-            msg.reply(`⚠️ *Número inválido!*`)
-        }
+        msg.reply("🚫 *Ainda não recebemos seu pagamento*\nAguardo alguns minutos após o pagamento e tente novamente.");
+           
     }
     static async checkout(msg, member, event) {
-        var _phoneId = await client.getNumberId(member.number)
-        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
-        if(_isValid) {
-            const res = await api.post(`/events/${event.id}/checkout`, {memberId: member.id})
-                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
+        await api.post(`/events/${event.id}/checkout`, {memberId: member.id})
+            .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
 
-            msg.reply(`Check-out de ${member.name} feito`);
-            return;
-        }
-        else
-        {
-            msg.reply(`⚠️ *Número inválido!*`)
-        }
+        msg.reply(`Check-out de ${member.name} feito`);
     }
     static async confirmPresence(msg, member, event) {
-        var _phoneId = await client.getNumberId(member.number)
-        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
-        if(_isValid) {
-            const res = await api.post(`/events/${event.id}/participants`, {memberId: member.id})
-                .catch(err => {msg.reply(`⚠️ *${err.response.data}*`)})
-            return;
-        }
-        else
-        {
-            msg.reply(`⚠️ *Número inválido!*`)
-        }
+        await api.post(`/events/${event.id}/participants`, {memberId: member.id})
+            .catch(err => {msg.reply(`⚠️ *${err.response.data}*`)})
     }
     static async cancelPresence(msg, member, event) {
-        var _phoneId = await client.getNumberId(member.number)
-        var _isValid = await client.isRegisteredUser(_phoneId._serialized)
-        if(_isValid) {
-            const res = api.post(`/events/${event.id}/recuse`, {memberId: member.id})
-                .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
-            return;
-        }
-        else
-        {
-            msg.reply(`⚠️ *Número inválido!*`)
-        }
+        api.post(`/events/${event.id}/recuse`, {memberId: member.id})
+            .catch(err =>msg.reply(`⚠️ *${err.response.data}*`))
     }
 }
 module.exports = MembersController;

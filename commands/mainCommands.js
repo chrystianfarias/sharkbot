@@ -155,8 +155,8 @@ const mainMenu = (msg, member) => {
                     }
                 ]
             },
-            ...admCommands
-        ], `Olá ${member.name}! 😁`));
+            //...admCommands
+        ], `👋 Olá ${member.name}! 😁`));
 }
 
 module.exports = proccessMessage;
