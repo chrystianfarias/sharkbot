@@ -11,7 +11,9 @@ const app = express();
 const cors = require('cors');
 const server = require('http').createServer(app);
 const bodyParser = require('body-parser');
-const port = process.env.PORT || 80;
+const port = process.env.PORT || 3000;
+let connected = false;
+let qrCode = "Loading...";
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -28,9 +30,10 @@ global.client = new Client({
 
 client.on('ready', async () => {
   console.log('Client is ready!');
+  connected = true;
 });
 client.on('qr', qr => {
-  console.log("https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(qr));
+  qrCode = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(qr);
 });
 
 global.currentChat = {}
@@ -61,6 +64,13 @@ app.post("/payReceive", async(req, res) => {
   client.sendMessage(member.number + "@c.us", webpImage, { sendMediaAsSticker: true });
 
   return res.status(200).json({});
+});
+app.get("/connect", async(req, res) => {
+  if (connected == false)
+  {
+    return res.send(`<img alt="qrcode" src="${qrCode}"/>`);
+  }
+  return res.send("Connected.");
 });
 
 server.listen(port, () =>
