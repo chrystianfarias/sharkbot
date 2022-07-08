@@ -16,7 +16,7 @@ const port = process.env.PORT || 3001;
 app.use(cors());
 app.use(bodyParser.json());
 
-global.client = new Client({
+global.client = new Client({ 
     restartOnAuthFail: true,
     puppeteer: {
       args: [
