@@ -11,7 +11,7 @@ const app = express();
 const cors = require('cors');
 const server = require('http').createServer(app);
 const bodyParser = require('body-parser');
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 80;
 
 app.use(cors());
 app.use(bodyParser.json());
