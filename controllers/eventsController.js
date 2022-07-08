@@ -28,21 +28,20 @@ class EventsController
         const event = await EventsController.getEvent(id);
         let members = await MembersController.getAll();
         members.forEach(async member => {
-            if (member.role == "guest")
-                return;
             let status = await MembersController.getStatus(member.number, event);
-            if (status.confirmed == undefined || (event.pix && status.paid == false))
+            
+            if (status.confirmed == undefined || (event.pix && status.paid == false && status.confirmed == true))
             {
                 var msg = "";
                 if (event.pix && status.paid == false && status.confirmed)
                 {
                     msg = "🚫 Você confirmou mas ainda não efetuou o pagamento";
-                    msg += "\n🪪 PIX: " + event.pix;
-                    msg += "\n💵 Valor: " + event.price.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    });;
+                    msg += "\n🪪 PIX: " + event.pix + "\n";
                 }
+                msg += "💵 Valor: " + event.price.toLocaleString('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                });;
                 client.sendMessage(member.number + "@c.us", new List(`*${event.name}*\n\n📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}\n${msg}`, "Ações", [
                     {
                         title: "Ações",
