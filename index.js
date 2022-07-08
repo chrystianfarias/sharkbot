@@ -19,7 +19,7 @@ app.use(bodyParser.json());
 global.client = new Client({ 
     restartOnAuthFail: true,
     puppeteer: {
-      args: [
+      args: [ 
         '--no-sandbox',
         '--disable-setuid-sandbox'
       ]
