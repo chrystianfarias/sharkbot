@@ -151,7 +151,14 @@ class EventsController
            style: 'currency',
            currency: 'BRL',
          });
-         priceStr += "\nPara pagar, *me chama no privado*!"
+         if (event.pix)
+         {
+            priceStr += "\n🪪 PIX: " + event.pix;
+         }
+         else
+         {
+            priceStr += "\nPara pagar, *me chama no privado*!"
+         }
       }
       const participants = await EventsController.getEventParticipants(event);
       if (participants.length == 0)
@@ -167,7 +174,7 @@ class EventsController
         }
 
         const newMsg = await client.sendMessage((chat.isGroup && member.role == "admin") || chat.isGroup == false ? msg.from : member.number + "@c.us",
-        new List(complete ? `📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}\n\nResponda *Quero ir* para confirmar sua presença, ou chame no privado.`:`Lista de presença`, "👥 Ver participantes", [
+        new List(complete ? `📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}${priceStr}\n\nResponda *Quero ir* para confirmar sua presença, ou chame no privado.`:`Lista de presença`, "👥 Ver participantes", [
             {
               title: "Participantes",
               rows: await Promise.all(participants.map(async (part, index) => {
