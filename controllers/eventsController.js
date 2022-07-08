@@ -33,8 +33,6 @@ class EventsController
             let status = await MembersController.getStatus(member.number, event);
             if (status.confirmed == undefined || (event.pix && status.paid == false))
             {
-                var _phoneId = await client.getNumberId(member.number)
-                var _isValid = await client.isRegisteredUser(_phoneId._serialized)
                 var msg = "";
                 if (event.pix && status.paid == false && status.confirmed)
                 {
@@ -45,35 +43,30 @@ class EventsController
                       currency: 'BRL',
                     });;
                 }
-                if(_isValid) {
-                    client.sendMessage(_phoneId._serialized, new List(`*${event.name}*\n\n📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}\n${msg}`, "Ações", [
-                       {
-                          title: "Ações",
-                          rows: [
-                             {
-                                id: "confirm_event_" + event.id,
-                                title: "✅ Confirmar presença"
-                             },
-                             {
-                                id: "recuse_event_" + event.id,
-                                title: "🚫 Recusar presença"
-                             },
-                             {
-                                id: "locate_event_" + event.id,
-                                title: "📌 Onde fica?"
-                             },
-                             {
-                                 id: "event_participants_" + event.id,
-                                 title: "👥 Ver participantes"
-                             }
-                          ]
-                       }
-                    ], `${member.name}, evento do SharkRunners`, "Clique no botão abaixo para ver algumas ações"));
-                }
-                else
-                {
-                    console.error(`O número do ${member.name} é invalido! (${member.number})`);
-                }
+                client.sendMessage(member.number + "@c.us", new List(`*${event.name}*\n\n📆${event.date}\n🕑${event.hour}\n📌${event.Local.name}\n${msg}`, "Ações", [
+                    {
+                        title: "Ações",
+                        rows: [
+                            {
+                            id: "confirm_event_" + event.id,
+                            title: "✅ Confirmar presença"
+                            },
+                            {
+                            id: "recuse_event_" + event.id,
+                            title: "🚫 Recusar presença"
+                            },
+                            {
+                            id: "locate_event_" + event.id,
+                            title: "📌 Onde fica?"
+                            },
+                            {
+                                id: "event_participants_" + event.id,
+                                title: "👥 Ver participantes"
+                            }
+                        ]
+                    }
+                ], `${member.name}, evento do SharkRunners`, "Clique no botão abaixo para ver algumas ações"));
+                
             }
         });
     }
